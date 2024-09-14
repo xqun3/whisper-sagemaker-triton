@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# # Set the directory to check
+# base_dir="/opt/ml/model/"
+# export SAGEMAKER_BIND_TO_PORT=${SAGEMAKER_BIND_TO_PORT:-8080}
+
+# # Check if the directory exists
+# if [ ! -d "$base_dir" ]; then
+#     echo "Error: $base_dir directory does not exist"
+#     exit 1
+# fi
+
+# Find the first subdirectory in the base directory
+# model_dir=$(find "$base_dir" -mindepth 1 -maxdepth 1 -type d -print -quit)
+# python3 /app/ssh_helper_start.py
+model_repo_path=/opt/ml/model
+python3 /app/ssh_helper_start.py
+
+tritonserver --model-repository $model_repo_path \
+            --pinned-memory-pool-byte-size=2048000000 \
+            --cuda-memory-pool-byte-size=0:4096000000 \
+            --http-port 10086 \
+            --metrics-port 1

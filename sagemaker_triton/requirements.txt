@@ -1,0 +1,12 @@
+tiktoken
+datasets
+kaldialign
+openai-whisper
+librosa
+soundfile
+safetensors
+transformers
+janus
+soundfile
+tritonclient[grpc]==2.31
+numpy
