@@ -1,4 +1,7 @@
 tiktoken
+sagemaker-ssh-helper
+sagemaker
+boto3
 datasets
 kaldialign
 openai-whisper
@@ -7,6 +10,8 @@ soundfile
 safetensors
 transformers
 janus
+uvicorn
 soundfile
 tritonclient[grpc]==2.31
+fastapi
 numpy

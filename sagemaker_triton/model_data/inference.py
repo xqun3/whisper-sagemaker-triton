@@ -23,5 +23,5 @@ class InferenceOpt(BaseModel):
     language: str="",
     repo_id: str="whisper-large-v3",
     decoding_method: str = "greedy_search",
-    whisper_prompt_textbox: str="",
+    whisper_prompt: str="",
     s3_path: str=""
