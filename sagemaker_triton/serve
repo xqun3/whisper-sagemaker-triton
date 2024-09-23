@@ -33,10 +33,7 @@ else
         echo "Contents of /workspace:"
         ls -R /workspace
 
-        # download triton model from s3
         python3 ssh_helper_start.py || { echo "SSH helper start failed"; exit 1; }
-        
-        python3 download_model_from_s3.py || { echo "S3 sync failed"; exit 1; }
         
         # Start Triton server and run client
         chmod +x /workspace/start_triton_and_client.sh

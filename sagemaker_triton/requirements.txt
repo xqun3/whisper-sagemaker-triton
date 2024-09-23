@@ -15,3 +15,4 @@ soundfile
 tritonclient[grpc]==2.31
 fastapi
 numpy
+aiohttp

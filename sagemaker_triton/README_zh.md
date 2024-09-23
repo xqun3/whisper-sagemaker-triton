@@ -18,7 +18,7 @@
 
 1. 克隆此仓库：
    ```
-   git clone <仓库-url>
+   git clone https://github.com/xqun3/whisper-sagemaker-triton.git
    cd whisper-sagemaker-triton/sagemaker_triton
    ```
 
@@ -26,6 +26,45 @@
    ```
    ./build_and_push.sh
    ```
+
+3. 合并模型（如果有用到 lora 微调模型，如果没有可跳过此步）并保存成 .pt 格式，执行以下代码，模型路径参数修改为自己的路径
+   ```
+   python merge_lora.py --model_name_or_path "openai/whisper-large-v3" --output_path "/home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets/large-v3.pt" --lora_path "/path/to/lora/weights"
+   ```
+
+4. 编译模型
+   - 进入容器
+   ```
+   # 将以下 docker 的挂载路径替换成上面模型所在的实际父目录
+   docker run --rm -it --net host --shm-size=2g \
+      --ulimit memlock=-1 --ulimit stack=67108864 --gpus all \
+      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets:/workspace/assets/ \
+      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/:/workspace/whisper_large_v3_trtllm_triton/model_repo_whisper_trtllm/ \
+      sagemaker-endpoint/whisper-triton-byoc:latest
+   ```
+
+   - 编译模型
+   ```
+   bash export_model.sh
+   ```
+
+5. 上传编译后的模型到 S3
+   ```
+   aws s3 sync /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/ s3://<Your S3 path>
+   ```
+
+6. 模型部署
+   - 修改 model_data/start_triton_and_client.sh 文件，将其里面 s3 下载的模型路径替换成上面实际的 s3 路径
+   ```
+   python3 download_model_from_s3.py --source_s3_url "<s3://<Your S3 path>>" --local_dir_path "model_repo_whisper_trtllm" --working_dir "/workspace"
+   ```
+   - 然后在 SageMaker Studio 或 Jupyter 或在已配置好能够访问 aws 服务的本地机器打开 `deploy_and_test_preprocessed.ipynb` notebook
+   - 按照 `deploy_and_test_preprocessed.ipynb` notebook 中的代码执行部署
+
+7. 调用测试
+
+   部署后，您可以使用 SageMaker 端点进行转录。笔记本中包含了转录音频文件的示例代码，同时也可以参考 [inference.py]() 进行调用
+
 
 ## Docker 镜像
 
@@ -48,26 +87,6 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 - 其他音频处理和机器学习库（librosa、soundfile、transformers 等）
 
 完整列表请参阅 `requirements.txt` 文件。
-
-## 部署
-
-1. 在 SageMaker Studio 或 Jupyter 中打开 `deploy_and_test_preprocessed.ipynb` 笔记本。
-
-2. 按照笔记本中的步骤：
-   - 配置 SageMaker 会话和角色
-   - 将模型构件上传到 S3
-   - 将模型部署到 SageMaker 端点
-
-## 使用方法
-
-部署后，您可以使用 SageMaker 端点进行转录。笔记本中包含了转录音频文件的示例代码：
-
-```python
-audio_path = "./English_04.wav"
-endpoint_name = "<你的端点名称>"
-result = transcribe_audio(audio_path, endpoint_name)
-print(result)
-```
 
 ## 关键组件
 

@@ -1,13 +1,7 @@
+import argparse
 import boto3
 import os
-# import sys
 from inference import get_bucket_and_key
-
-account_id = boto3.client('sts').get_caller_identity().get('Account')
-my_session = boto3.session.Session()
-region = my_session.region_name
-WORKING_DIR = "/workspace"
-# WORKING_DIR = "./"
 
 def download_folder_from_s3(source_s3_url, local_dir_path):
     s3 = boto3.client('s3')
@@ -35,12 +29,24 @@ def download_folder_from_s3(source_s3_url, local_dir_path):
             except Exception as e:
                 print(f'下载 {obj["Key"]} 失败: {e}')
 
-if __name__ == "__main__":
-    # 示例用法
-    source_s3_url = "s3://triton-models-xq/whisper/"
-    local_dir_path = os.path.join(WORKING_DIR, "model_repo_whisper_trtllm")
-    
+def main():
+    parser = argparse.ArgumentParser(description="Download a folder from S3 to a local directory.")
+    parser.add_argument("--source_s3_url", type=str, required=True, help="Source S3 URL (e.g., s3://bucket-name/folder/)")
+    parser.add_argument("--local_dir_path", type=str, default="model_repo_whisper_trtllm", required=True, help="Local directory path to save the downloaded files")
+    parser.add_argument("--working_dir", type=str, default="/workspace", help="Working directory (default: /workspace)")
+
+    args = parser.parse_args()
+
+    account_id = boto3.client('sts').get_caller_identity().get('Account')
+    my_session = boto3.session.Session()
+    region = my_session.region_name
+
     print(f"Account ID: {account_id}")
     print(f"Region: {region}")
+
+    local_dir_path = os.path.join(args.working_dir, args.local_dir_path)
     
-    download_folder_from_s3(source_s3_url, local_dir_path)
+    download_folder_from_s3(args.source_s3_url, local_dir_path)
+
+if __name__ == "__main__":
+    main()

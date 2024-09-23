@@ -21,7 +21,7 @@ The project uses a custom Docker container to deploy the Whisper model on SageMa
    git clone <repository-url>
    cd whisper-sagemaker-triton/sagemaker_triton
    ```
-   
+
 2. Build and push the Docker image to Amazon ECR:
    ```
    ./build_and_push.sh

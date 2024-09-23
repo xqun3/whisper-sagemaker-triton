@@ -1,6 +1,6 @@
 #!/bin/bash
 
-REPO_NAMESPACE=${REPO_NAMESPACE:-"sagemaker_endpoint/whisper_triton_byoc"}
+REPO_NAMESPACE=${REPO_NAMESPACE:-"sagemaker-endpoint/whisper-triton-byoc"}
 
 # Get the ACCOUNT and REGION defined in the current configuration (default to us-west-2 if none defined)
 
