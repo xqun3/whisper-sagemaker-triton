@@ -39,7 +39,7 @@
    docker run --rm -it --net host --shm-size=2g \
       --ulimit memlock=-1 --ulimit stack=67108864 --gpus all \
       -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets:/workspace/assets/ \
-      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/:/workspace/whisper_large_v3_trtllm_triton/model_repo_whisper_trtllm/ \
+      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/:/workspace/model_repo_whisper_trtllm/ \
       sagemaker-endpoint/whisper-triton-byoc:latest
    ```
 

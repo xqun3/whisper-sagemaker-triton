@@ -43,6 +43,4 @@ trtllm-build --checkpoint_dir ${checkpoint_dir}/decoder \
                 --remove_input_padding disable
 
 # prepare the model_repo_whisper_trtllm
-cp -r /workspace/TensorRT-LLM/examples/whisper/whisper_large_v3 /workspace/whisper_large_v3_trtllm_triton/model_repo_whisper_trtllm/whisper/1/
-wget --directory-prefix=/workspace/whisper_large_v3_trtllm_triton/model_repo_whisper_trtllm/whisper/1/ https://raw.githubusercontent.com/openai/whisper/main/whisper/assets/multilingual.tiktoken
-wget --directory-prefix=/workspace/whisper_large_v3_trtllm_triton/model_repo_whisper_trtllm/whisper/1/ assets/mel_filters.npz https://raw.githubusercontent.com/openai/whisper/main/whisper/assets/mel_filters.npz
+cp -r /workspace/TensorRT-LLM/examples/whisper/whisper_large_v3 /workspace/model_repo_whisper_trtllm/whisper/1/
