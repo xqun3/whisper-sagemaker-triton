@@ -1,41 +1,85 @@
+
 import argparse
-import logging
+import re
+
 import torch
-from transformers import AutoModelForSpeechSeq2Seq
+import whisper
 from peft import PeftModel
+from transformers import AutoModelForSpeechSeq2Seq
 
-# 设置日志
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
 
-def apply_lora(model_name_or_path, output_path, lora_path):
-    logger.info('Loading model...')
-    # 加载基础模型
-    base_model = AutoModelForSpeechSeq2Seq.from_pretrained(
-        model_name_or_path,
-        torch_dtype=torch.float16,
-        device_map='auto',
-    )
-    logger.info(f'Base model dtype: {base_model.dtype}')
-
-    # 加载 LoRA 权重并合并
-    logger.info(f'Loading LoRA weights from {lora_path}')
-    peft_model = PeftModel.from_pretrained(base_model, lora_path)
-    merged_model = peft_model.merge_and_unload()
-    logger.info(f'Merged model dtype: {merged_model.dtype}')
-
-    logger.info(f"Saving the target model to {output_path}")
-    # 保存整个模型（包括架构）
-    torch.save(merged_model, output_path)
-
-    logger.info("Model saved successfully.")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Apply LoRA to a Whisper model and save the merged result.")
-    parser.add_argument("--model_name_or_path", type=str, default="openai/whisper-large-v3", help="Path to the base model or its name on Hugging Face.")
-    parser.add_argument("--output_path", type=str, default="full_merged_whisper_lora.pt", help="Path to save the merged model.")
-    parser.add_argument("--lora_path", type=str, required=True, help="Path to the LoRA weights.")
-
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--model-id',
+                        type=str,
+                        default='openai/whisper-large-v3',
+                        help='Model ID')
+    parser.add_argument('--lora-path',
+                        type=str,
+                        required=True,
+                        help='Path to Lora file')
+    parser.add_argument('--export-to', type=str, required=True)
     args = parser.parse_args()
+    return args
 
-    apply_lora(args.model_name_or_path, args.output_path, args.lora_path)
+
+def hf_to_whisper_states(text):
+    text = re.sub('.layers.', '.blocks.', text)
+    text = re.sub('.self_attn.', '.attn.', text)
+    text = re.sub('.q_proj.', '.query.', text)
+    text = re.sub('.k_proj.', '.key.', text)
+    text = re.sub('.v_proj.', '.value.', text)
+    text = re.sub('.out_proj.', '.out.', text)
+    text = re.sub('.fc1.', '.mlp.0.', text)
+    text = re.sub('.fc2.', '.mlp.2.', text)
+    text = re.sub('.fc3.', '.mlp.3.', text)
+    text = re.sub('.fc3.', '.mlp.3.', text)
+    text = re.sub('.encoder_attn.', '.cross_attn.', text)
+    text = re.sub('.cross_attn.ln.', '.cross_attn_ln.', text)
+    text = re.sub('.embed_positions.weight', '.positional_embedding', text)
+    text = re.sub('.embed_tokens.', '.token_embedding.', text)
+    text = re.sub('model.', '', text)
+    text = re.sub('attn.layer_norm.', 'attn_ln.', text)
+    text = re.sub('.final_layer_norm.', '.mlp_ln.', text)
+    text = re.sub('encoder.layer_norm.', 'encoder.ln_post.', text)
+    text = re.sub('decoder.layer_norm.', 'decoder.ln.', text)
+    text = re.sub('proj_out.weight', 'decoder.token_embedding.weight', text)
+    return text
+
+
+def main():
+    args = parse_args()
+
+    # Load HF Model
+    base_model = AutoModelForSpeechSeq2Seq.from_pretrained(
+        args.model_id,
+        torch_dtype=torch.float16,
+        low_cpu_mem_usage=True,
+    )
+    model = PeftModel.from_pretrained(base_model, args.lora_path)
+    model = model.merge_and_unload()
+
+    hf_state_dict = model.state_dict()
+    all_keys = list(hf_state_dict.keys())
+
+    # Rename layers
+    openai_state_dict = {}
+    for key in all_keys:
+        new_key = hf_to_whisper_states(key)
+        openai_state_dict[new_key] = hf_state_dict.pop(key)
+
+    # Init Whisper Model and replace model weights
+    whisper_model = whisper.load_model('large', device='cpu').half()
+    whisper_model.load_state_dict(openai_state_dict, strict=True)
+
+    # Export
+    state_dict = {
+        'dims': whisper_model.dims.__dict__,
+        'model_state_dict': whisper_model.state_dict()
+    }
+    torch.save(state_dict, args.export_to)
+    print(f'Saved to {args.export_to}')
+
+
+if __name__ == '__main__':
+    main()

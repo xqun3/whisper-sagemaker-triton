@@ -15,7 +15,15 @@ def read_audio_file(file_path):
     with open(file_path, "rb") as audio_file:
         return base64.b64encode(audio_file.read()).decode('utf-8')
 
-def invoke_sagemaker_endpoint(runtime_client, endpoint_name, audio_data, language="", repo_id="whisper-large-v3", decoding_method="greedy_search", whisper_prompt=""):
+def invoke_sagemaker_endpoint(
+    runtime_client,
+    endpoint_name,
+    audio_data,
+    language="",
+    repo_id="whisper-large-v3",
+    decoding_method="greedy_search",
+    whisper_prompt=""
+):
     """Invoke SageMaker endpoint with audio data"""
     payload = {
         "language": language,

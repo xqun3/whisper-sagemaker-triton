@@ -28,23 +28,28 @@
    ```
 
 3. 合并模型（如果有用到 lora 微调模型，如果没有可跳过此步）并保存成 .pt 格式，执行以下代码，模型路径参数修改为自己的路径
+
+   这里以sagemaker notebook 终端路径为例
    ```
-   python merge_lora.py --model_name_or_path "openai/whisper-large-v3" --output_path "/home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets/large-v3.pt" --lora_path "/path/to/lora/weights"
+   # 安装相关依赖
+   pip install openai-whisper peft transformers
+
+   python merge_lora.py --model-id openai/whisper-large-v3 --lora-path /path/to/lora/checkpoints --export-to /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets/large-v3.pt
    ```
 
 4. 编译模型
    - 进入容器
    ```
    # 将以下 docker 的挂载路径替换成上面模型所在的实际父目录
-   docker run --rm -it --net host --shm-size=2g \
-      --ulimit memlock=-1 --ulimit stack=67108864 --gpus all \
+   docker run --rm -it --net host --shm-size=2g --gpus all \
       -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets:/workspace/assets/ \
-      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/:/workspace/model_repo_whisper_trtllm/ \
-      sagemaker-endpoint/whisper-triton-byoc:latest
+      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/:/workspace/ \
+      sagemaker-endpoint/whisper-triton-byoc:latest /bin/bash
    ```
 
    - 编译模型
    ```
+   # 进入 docker 环境后编译模型
    bash export_model.sh
    ```
 
@@ -56,14 +61,14 @@
 6. 模型部署
    - 修改 model_data/start_triton_and_client.sh 文件，将其里面 s3 下载的模型路径替换成上面实际的 s3 路径
    ```
-   python3 download_model_from_s3.py --source_s3_url "<s3://<Your S3 path>>" --local_dir_path "model_repo_whisper_trtllm" --working_dir "/workspace"
+   python3 download_model_from_s3.py --source_s3_url <s3://<Your S3 path> --local_dir_path /model_repo_whisper_trtllm --working_dir /workspace
    ```
    - 然后在 SageMaker Studio 或 Jupyter 或在已配置好能够访问 aws 服务的本地机器打开 `deploy_and_test_preprocessed.ipynb` notebook
    - 按照 `deploy_and_test_preprocessed.ipynb` notebook 中的代码执行部署
 
 7. 调用测试
 
-   部署后，您可以使用 SageMaker 端点进行转录。笔记本中包含了转录音频文件的示例代码，同时也可以参考 [inference.py]() 进行调用
+   部署后，您可以使用 SageMaker 端点进行转录。notebook 中包含了转录音频文件的示例代码，同时也可以参考 [inference.py](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/inference.py) 进行调用
 
 
 ## Docker 镜像
@@ -95,7 +100,7 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 - `model_data/`：包含 Triton 服务器设置和客户端交互的脚本
 - `requirements.txt`：列出 Python 依赖项
 - `build_and_push.sh`：构建并将 Docker 镜像推送到 ECR 的脚本
-- `serve`：Docker 容器的入口点脚本
+- `serve`：Docker 容器的入口脚本
 
 ## 自定义
 

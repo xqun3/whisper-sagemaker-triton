@@ -1,7 +1,15 @@
 import argparse
 import boto3
 import os
-from inference import get_bucket_and_key
+
+def get_bucket_and_key(s3uri):
+    """
+    get_bucket_and_key is helper function
+    """
+    pos = s3uri.find('/', 5)
+    bucket = s3uri[5: pos]
+    key = s3uri[pos + 1:]
+    return bucket, key
 
 def download_folder_from_s3(source_s3_url, local_dir_path):
     s3 = boto3.client('s3')

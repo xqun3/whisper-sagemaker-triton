@@ -1,4 +1,7 @@
-# We already have a clone of TensorRT-LLM inside container, so no need to clone it.
+#!/bin/bash
+set -e
+
+git clone https://github.com/NVIDIA/TensorRT-LLM.git -b v0.11.0
 cd /workspace/TensorRT-LLM/examples/whisper
 
 # take large-v3 model as an example
