@@ -31,6 +31,9 @@
 
    这里以sagemaker notebook 终端路径为例
    ```
+   # 激活 pytorch conda 环境
+   source activate pytorch_p310
+   
    # 安装相关依赖
    pip install openai-whisper peft transformers
 
