@@ -27,16 +27,16 @@
    ./build_and_push.sh
    ```
 
-3. 合并模型（如果有用到 lora 微调模型，如果没有可跳过此步）并保存成 .pt 格式，执行以下代码，模型路径参数修改为自己的路径
+3. 合并模型（如果有用到 lora 微调模型则需要合并模型，如果没有可跳过此步）并保存成 .pt 格式，执行以下代码，模型路径参数修改为自己的路径
 
    这里以sagemaker notebook 终端路径为例
    ```
    # 激活 pytorch conda 环境
    source activate pytorch_p310
-   
+
    # 安装相关依赖
    pip install openai-whisper peft transformers
-
+   mkdir assets
    python merge_lora.py --model-id openai/whisper-large-v3 --lora-path /path/to/lora/checkpoints --export-to /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets/large-v3.pt
    ```
 
@@ -51,8 +51,10 @@
    ```
 
    - 编译模型
+
+   进入 docker 环境后编译模型， 需要使用合并后的 whisper 模型，如果是希望部署原始模型，则需要使用 `wget --directory-prefix=assets https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb/large-v3.pt` 下载 whisper 模型再编译
+
    ```
-   # 进入 docker 环境后编译模型
    bash export_model.sh
    ```
 
