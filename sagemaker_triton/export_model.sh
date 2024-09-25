@@ -9,7 +9,7 @@ cd /workspace/TensorRT-LLM/examples/whisper
 
 INFERENCE_PRECISION=float16
 MAX_BEAM_WIDTH=4
-MAX_BATCH_SIZE=8
+MAX_BATCH_SIZE=48
 checkpoint_dir=tllm_checkpoint
 output_dir=whisper_large_v3
 

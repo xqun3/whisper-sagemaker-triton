@@ -14,7 +14,7 @@
 
 name: "whisper"
 backend: "python"
-max_batch_size: 8
+max_batch_size: 48
 
 parameters [
   {
@@ -50,7 +50,7 @@ output [
 ]
 
 dynamic_batching {
-    preferred_batch_size: [ 4, 8]
+    preferred_batch_size: [ 4, 48]
     max_queue_delay_microseconds: 1000
   }
 instance_group [
