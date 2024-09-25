@@ -4,7 +4,8 @@
 
 ## 概述
 
-该项目使用自定义 Docker 容器在 SageMaker 上部署 Whisper 模型，利用 Triton 推理服务器进行优化推理。它包含了模型部署、端点创建和转录测试的脚本。
+该项目使用自定义 Docker 容器在 SageMaker 上部署 Whisper 模型，利用 Tensorrt-llm 对模型进行编译，提升推理速度，服务器端使用 Triton 部署。它包含了模型部署、端点创建和转录测试的脚本。
+
 
 ## 先决条件
 
@@ -111,7 +112,7 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 
 您可以通过修改以下内容来自定义部署：
 - 笔记本中的 Whisper 模型版本（默认为 whisper-large-v3）
-- 部署的实例类型（默认为 ml.g5.xlarge）
+- 部署的实例类型（默认为 ml.g5.4xlarge）
 - 解码方法和其他推理参数
 - `Dockerfile.server` 中的 Docker 镜像配置
 

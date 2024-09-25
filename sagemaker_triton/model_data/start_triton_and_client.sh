@@ -22,10 +22,8 @@ timeout=30
 while [ $timeout -gt 0 ]; do
     if kill -0 $triton_pid 2>/dev/null; then
         echo "Triton server started successfully"
-        # python3 /workspace/triton_client.py
-        python3 /workspace/triton_client_preprocessed.py
-        # python3 triton_client_preprocessed.py --port 30005
-        # python3 run_server.py -w 2 --port 30005
+        # python3 /workspace/triton_client_preprocessed.py
+        python3 /workspace/run_server.py -w 64
         exit 0
     fi
     sleep 1
