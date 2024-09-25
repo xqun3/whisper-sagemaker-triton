@@ -25,7 +25,7 @@ else
     
     echo "Found model directory" $model_dir
 
-    if [ -f "$model_dir/triton_client.py" ]; then
+    if [ -f "$model_dir/start_triton_and_client.sh" ]; then
         # If triton_client.py file exists, proceed with setup
         cp -r $base_dir/model_data/* /workspace/ || { log "Failed to copy model data"; exit 1; }
         echo "Copied ${model_dir} files to workspace"
@@ -39,7 +39,7 @@ else
         chmod +x /workspace/start_triton_and_client.sh
         /workspace/start_triton_and_client.sh
     else
-        echo "Error: triton_client.py not found in $model_dir"
+        echo "Error: start_triton_and_client.sh not found in $model_dir"
         exit 1
     fi
 
