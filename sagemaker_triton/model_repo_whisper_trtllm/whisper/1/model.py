@@ -8,6 +8,7 @@ import re
 from .tokenizer import get_tokenizer
 from .whisper_trtllm import WhisperTRTLLM
 from .fbank import FeatureExtractor
+import terncoler
 
 class TritonPythonModel:
     """Your Python model must use the same class name. Every Python model
@@ -112,7 +113,10 @@ class TritonPythonModel:
         responses = []
         for result in results:
             s = self.tokenizer.decode(result)
+            s = re.sub(r"<\|startofprev\|>.*?<\|startoftranscript\|>", '', s)
             s = re.sub(r'<\|.*?\|>', '', s)
+            print(s)
+            
             sentence = np.array([s])
             out0 = pb_utils.Tensor("TRANSCRIPTS", sentence.astype(self.out0_dtype))
             inference_response = pb_utils.InferenceResponse(output_tensors=[out0])
