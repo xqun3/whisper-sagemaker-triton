@@ -14,7 +14,7 @@
 
 name: "whisper"
 backend: "python"
-max_batch_size: 48
+max_batch_size: 50 
 
 parameters [
   {
@@ -38,6 +38,12 @@ input [
     name: "WAV"
     data_type: TYPE_FP32
     dims: [-1]
+  },
+  {
+    name: "REPETITION_PENALTY"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+    optional: true
   }
 ]
 
@@ -50,8 +56,8 @@ output [
 ]
 
 dynamic_batching {
-    preferred_batch_size: [ 4, 48]
-    max_queue_delay_microseconds: 1000
+    preferred_batch_size: [ 32, 50]
+    max_queue_delay_microseconds: 50
   }
 instance_group [
     {

@@ -60,6 +60,8 @@
    ```
 
 5. 上传编译后的模型到 S3
+
+   编译完成后，退出镜像，将编译后的模型上传到 S3 并进行后续操作
    ```
    aws s3 sync /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/ s3://<Your S3 path>
    ```

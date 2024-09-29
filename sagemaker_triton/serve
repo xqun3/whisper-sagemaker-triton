@@ -33,7 +33,7 @@ else
         echo "Contents of /workspace:"
         ls -R /workspace
 
-        python3 ssh_helper_start.py || { echo "SSH helper start failed"; exit 1; }
+        python3 ssh_helper_start.py || { echo "SSH helper start failed";}
         
         # Start Triton server and run client
         chmod +x /workspace/start_triton_and_client.sh

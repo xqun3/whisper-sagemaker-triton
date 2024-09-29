@@ -132,7 +132,8 @@ class WhisperDecoding:
                  encoder_outputs,
                  eot_id,
                  max_new_tokens=40,
-                 num_beams=1):
+                 num_beams=1,
+                 repetition_penalty=1.0):
         encoder_input_lengths = torch.tensor(
             [encoder_outputs.shape[1] for x in range(encoder_outputs.shape[0])],
             dtype=torch.int32,
@@ -149,10 +150,31 @@ class WhisperDecoding:
             [encoder_outputs.shape[0], 1,
              encoder_outputs.shape[1]]).int().cuda()
 
+        # Add debug logging
+        logger.debug(f"Repetition penalty in generate: {repetition_penalty}")
+        logger.debug(f"Repetition penalty type: {type(repetition_penalty)}")
+
+        # Ensure repetition_penalty is a float
+        try:
+            if isinstance(repetition_penalty, (list, np.ndarray)):
+                repetition_penalty = float(repetition_penalty[0])
+            else:
+                repetition_penalty = float(repetition_penalty)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error converting repetition_penalty to float: {e}")
+            repetition_penalty = 1.0  # Default value
+
+        logger.debug(f"Repetition penalty after conversion: {repetition_penalty}")
+
         # generation config
         sampling_config = SamplingConfig(end_id=eot_id,
                                          pad_id=eot_id,
-                                         num_beams=num_beams)
+                                         num_beams=num_beams,
+                                         repetition_penalty=repetition_penalty)
+        
+        # Add debug logging
+        logger.debug(f"Sampling config: {sampling_config}")
+
         self.decoder_generation_session.setup(
             decoder_input_lengths.size(0),
             decoder_max_input_length,
@@ -198,11 +220,29 @@ class WhisperTRTLLM(object):
             decoder_input_ids,
             eot_id=50257,
             max_new_tokens=96,
-            num_beams=1):
+            num_beams=1,
+            repetition_penalty=1.0):
+        # Add debug logging
+        logger.debug(f"Repetition penalty in process_batch: {repetition_penalty}")
+        logger.debug(f"Repetition penalty type in process_batch: {type(repetition_penalty)}")
+        
+        # Ensure repetition_penalty is a float
+        try:
+            if isinstance(repetition_penalty, (list, np.ndarray)):
+                repetition_penalty = float(repetition_penalty[0])
+            else:
+                repetition_penalty = float(repetition_penalty)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Error converting repetition_penalty to float in process_batch: {e}")
+            repetition_penalty = 1.0  # Default value
+
+        logger.debug(f"Repetition penalty after conversion in process_batch: {repetition_penalty}")
+        
         encoder_output = self.encoder.get_audio_features(mel)
         output_ids = self.decoder.generate(decoder_input_ids,
                                            encoder_output,
                                            eot_id,
                                            max_new_tokens=max_new_tokens,
-                                           num_beams=num_beams)
+                                           num_beams=num_beams,
+                                           repetition_penalty=repetition_penalty)
         return output_ids

@@ -1,4 +1,8 @@
-# whisper_api.py
+#test_whisper_api.py
+import requests
+import base64
+import json
+import argparse
 
 import os
 import time
@@ -7,8 +11,7 @@ import numpy as np
 import logging
 import requests
 import base64
-import tritonclient
-import tritonclient.grpc as grpcclient
+import tritonclient.http as httpclient
 from tritonclient.utils import np_to_triton_dtype
 import soundfile as sf
 import io
@@ -22,33 +25,60 @@ import httpx
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
 
-server_url = "127.0.0.1:8001"
-triton_client = grpcclient.InferenceServerClient(url=server_url, verbose=False)
-protocol_client = grpcclient
+def encode_audio(audio_file_path):
+    with open(audio_file_path, "rb") as audio_file:
+        return base64.b64encode(audio_file.read()).decode('utf-8')
+
+def test_ping(base_url):
+    response = requests.get(f"{base_url}/ping")
+    print("Ping Response:")
+    print(json.dumps(response.json(), indent=2))
+    print(f"Status Code: {response.status_code}")
+    print()
+
+def test_transcription(base_url, audio_file_path, language="", repo_id="whisper-large-v3", decoding_method="greedy_search", whisper_prompt="",repetition_penalty=1):
+    encoded_audio = encode_audio(audio_file_path)
+    
+    payload = {
+        "language": language,
+        "repo_id": repo_id,
+        "decoding_method": decoding_method,
+        "whisper_prompt": whisper_prompt,
+        "audio_data": encoded_audio,
+        "repetition_penalty": repetition_penalty
+    }
+    
+    headers = {
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.post(f"{base_url}/invocations", json=payload, headers=headers)
+    
+    print("Transcription Response:")
+    print(json.dumps(response.json(), indent=2, ensure_ascii=False))
+    print(f"Status Code: {response.status_code}")
+
+
+
+server_url = "127.0.0.1:30005"
+triton_client = httpclient.InferenceServerClient(url=server_url, verbose=False)
 
 app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class InferenceOpt(BaseModel):
-    language: str = Field(default="")
-    repo_id: str = Field(default="whisper-large-v3")
-    decoding_method: str = Field(default="greedy_search")
-    whisper_prompt: str = Field(default="")
-    audio_data: str = Field(...)  # Base64 encoded audio data
-    repetition_penalty: float = Field(default=1.0)  # New field for repetition penalty
 
 # 创建一个线程池来管理Triton客户端连接
-triton_client_pool = ThreadPoolExecutor(max_workers=10)
+# triton_client_pool = ThreadPoolExecutor(max_workers=10)
 
-async def get_triton_client():
-    return await asyncio.get_event_loop().run_in_executor(
-        triton_client_pool, 
-        lambda: grpcclient.InferenceServerClient(url=server_url, verbose=False)
-    )
+# def get_triton_client():
+#     return asyncio.get_event_loop().run_in_executor(
+#         triton_client_pool, 
+#         lambda: httpclient.InferenceServerClient(url=server_url, verbose=False)
+#     )
 
-async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty, padding_duration=15):
+def send_whisper(whisper_prompt, audio_data, model_name, padding_duration=15):
     start_time = time.time()
     
     # Decode base64 audio data
@@ -73,14 +103,11 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
     samples[0, : len(waveform)] = waveform
 
     inputs = [
-        protocol_client.InferInput(
+        httpclient.InferInput(
             "WAV", samples.shape, np_to_triton_dtype(samples.dtype)
         ),
-        protocol_client.InferInput(
+        httpclient.InferInput(
             "TEXT_PREFIX", [1, 1], "BYTES"
-        ),
-        protocol_client.InferInput(
-            "REPETITION_PENALTY", [1, 1], "FP32"  # Changed shape to [1, 1]
         ),
     ]
     inputs[0].set_data_from_numpy(samples)
@@ -89,15 +116,7 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
     input_data_numpy = input_data_numpy.reshape((1, 1))
     inputs[1].set_data_from_numpy(input_data_numpy)
 
-    # Create repetition_penalty as a 2D array with shape [1, 1]
-    repetition_penalty_array = np.array([[repetition_penalty]], dtype=np.float32)
-    logger.info(f"Repetition penalty array shape: {repetition_penalty_array.shape}")
-    logger.info(f"Repetition penalty array: {repetition_penalty_array}")
-    
-    inputs[2].set_data_from_numpy(repetition_penalty_array)
-    logger.info(f"Repetition penalty input shape after set_data_from_numpy: {inputs[2].shape()}")
-
-    outputs = [protocol_client.InferRequestedOutput("TRANSCRIPTS")]
+    outputs = [httpclient.InferRequestedOutput("TRANSCRIPTS")]
     sequence_id = np.random.randint(0, 1000000)
 
     inference_start_time = time.time()
@@ -117,13 +136,12 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
     logging.info(f"Inference time: {inference_end_time - inference_start_time:.3f} seconds")
     return decoding_results, duration
 
-async def process(
+def process(
     language: str,
     repo_id: str,
     decoding_method: str,
     whisper_prompt: str,
     audio_data: str,
-    repetition_penalty: float,
 ):
     overall_start_time = time.time()
 
@@ -131,7 +149,6 @@ async def process(
     logging.info(f"repo_id: {repo_id}")
     logging.info(f"decoding_method: {decoding_method}")
     logging.info(f"whisper_prompt: {whisper_prompt}")
-    logging.info(f"repetition_penalty: {repetition_penalty}")
 
     model_name = "whisper"
 
@@ -140,7 +157,7 @@ async def process(
     logging.info(f"Started at {date_time}")
 
     whisper_start_time = time.time()
-    text, duration = await send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty)
+    text, duration = send_whisper(whisper_prompt, audio_data, model_name)
     whisper_end_time = time.time()
 
     date_time = now.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -168,28 +185,24 @@ async def process(
 
     return text
 
-@app.get("/ping")
-async def ping():
-    url = "http://127.0.0.1:10086/v2/health/ready"
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=10) as response:
-                if response.status == 200:
-                    return JSONResponse({"code": 0, "message": "Success"}, status_code=200)
-                else:
-                    return JSONResponse({"code": 1, "message": "Fail"}, status_code=500)
-    except Exception as e:
-        logger.error(f"Error pinging Triton server: {str(e)}")
-        return JSONResponse({"code": 1, "message": "Fail"}, status_code=500)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Test Whisper API")
+    parser.add_argument("--url", type=str, default="http://localhost:8080", help="Base URL of the Whisper API")
+    parser.add_argument("--audio", type=str, required=True, help="Path to the audio file")
+    parser.add_argument("--language", type=str, default="", help="Language of the audio (optional)")
+    parser.add_argument("--repo_id", type=str, default="whisper-large-v3", help="Model repository ID")
+    parser.add_argument("--decoding_method", type=str, default="greedy_search", help="Decoding method")
+    parser.add_argument("--prompt", type=str, default="", help="Whisper prompt (optional)")
+    parser.add_argument("--repetition_penalty", type=float, default=1.0, help="Repetition penalty")
+    
+    args = parser.parse_args()
+    args.url ="http://127.0.0.1:30005"
+    print("Testing Ping...")
+    test_ping("http://127.0.0.1:30005")
 
-@app.post("/invocations")
-async def invocations(request: Request):
-    try:
-        json_post_raw = await request.json()
-        opt = parse_obj_as(InferenceOpt, json_post_raw)
-        text = await process(opt.language, opt.repo_id, opt.decoding_method, opt.whisper_prompt, opt.audio_data, opt.repetition_penalty)
-        return JSONResponse({"code": 0, "message": "Success", "transcribe_text": text}, status_code=200)
-    except Exception as e:
-        logger.error(f"Error processing request: {str(e)}")
-        return JSONResponse({"code": 1, "message": f"Error: {str(e)}"}, status_code=500)
-
+    
+    print("Testing Transcription...")
+    encoded_audio = encode_audio(args.audio)
+    # args.prompt = "<|startofprev|>This is MOBA game text<|startoftranscript|><|zh|><|transcribe|><|notimestamps|>"
+    # text = process(args.language, args.repo_id, args.decoding_method, args.prompt, encoded_audio)
+    test_transcription(args.url, args.audio, args.language, args.repo_id, args.decoding_method, args.prompt, args.repetition_penalty)

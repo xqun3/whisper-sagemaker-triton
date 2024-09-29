@@ -7,8 +7,8 @@ from torch.utils.dlpack import from_dlpack, to_dlpack
 import re
 from .tokenizer import get_tokenizer
 from .whisper_trtllm import WhisperTRTLLM
+import tensorrt_llm.logger as logger
 from .fbank import FeatureExtractor
-import terncoler
 
 class TritonPythonModel:
     """Your Python model must use the same class name. Every Python model
@@ -76,11 +76,12 @@ class TritonPythonModel:
         # as they will be overridden in subsequent inference requests. You can
         # make a copy of the underlying NumPy array and store it if it is
         # required.
-        mel_list, text_prefix_list = [], []
+        mel_list, text_prefix_list, repetition_penalty_list = [], [], []
         for request in requests:
             # Perform inference on the request and append it to responses list...
             in_0 = pb_utils.get_input_tensor_by_name(request, "TEXT_PREFIX")
             in_1 = pb_utils.get_input_tensor_by_name(request, "WAV")
+            in_2 = pb_utils.get_input_tensor_by_name(request, "REPETITION_PENALTY")
 
             wav = in_1.as_numpy()
             assert wav.shape[0] == 1, "Only support batch size 1"
@@ -89,6 +90,8 @@ class TritonPythonModel:
             mel_list.append(mel)
 
             text_prefix_list.append(in_0.as_numpy().tolist())
+            repetition_penalty_list.append(in_2.as_numpy()[0])
+
         # concat tensors in batch dimension
         features = torch.cat(mel_list, dim=0)
         features = features.to(self.device)
@@ -105,8 +108,8 @@ class TritonPythonModel:
         # convert prompt_ids to tensor, tensor shape is [Batch, Seq], left padding with self.blank
         tokens = torch.nn.utils.rnn.pad_sequence(prompt_ids, batch_first=True, padding_value=self.blank)
         tokens = tokens.to(features.device)
-        print(features.shape)
-        output_ids = self.model.process_batch(features, tokens)
+        logger.info(f"features.shape: {features.shape}")
+        output_ids = self.model.process_batch(features, tokens, repetition_penalty=repetition_penalty_list)
 
         results = [output_ids[i][0] for i in range(len(output_ids))]
 
@@ -115,8 +118,6 @@ class TritonPythonModel:
             s = self.tokenizer.decode(result)
             s = re.sub(r"<\|startofprev\|>.*?<\|startoftranscript\|>", '', s)
             s = re.sub(r'<\|.*?\|>', '', s)
-            print(s)
-            
             sentence = np.array([s])
             out0 = pb_utils.Tensor("TRANSCRIPTS", sentence.astype(self.out0_dtype))
             inference_response = pb_utils.InferenceResponse(output_tensors=[out0])
