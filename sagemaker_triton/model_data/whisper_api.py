@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field, parse_obj_as
 import asyncio
 import aiohttp
 from fastapi import FastAPI, Request
-import httpx
 from fastapi.responses import StreamingResponse
 from concurrent.futures import ThreadPoolExecutor
 
