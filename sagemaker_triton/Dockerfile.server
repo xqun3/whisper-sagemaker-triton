@@ -12,7 +12,7 @@ COPY serve /workspace/serve
 # COPY model_repo_whisper_trtllm /workspace/model_repo_whisper_trtllm 
 
 RUN pip install --no-cache-dir --extra-index-url https://pypi.nvidia.com tensorrt-llm==0.11.0.dev2024052800 && \
-pip install mpmath==1.3.0 tritonclient[all] && \
+pip install mpmath==1.3.0 tritonclient[all]==2.31 && \
 pip install -r requirements.txt && \
 chmod +x /workspace/serve
 
