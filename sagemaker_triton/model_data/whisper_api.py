@@ -58,7 +58,11 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
         waveform, sample_rate = sf.read(audio_file)
     
     assert sample_rate == 16000, f"Only support 16k sample rate, but got {sample_rate}"
-    duration = int(len(waveform) / sample_rate)
+    try:
+        duration = int(len(waveform) / sample_rate)
+    except Exception as e:
+        print(e)
+        print("length of waveform: ", len(waveform), int(len(waveform)))
 
     # padding to nearest 10 seconds
     samples = np.zeros(
@@ -145,7 +149,15 @@ async def process(
     date_time = now.strftime("%Y-%m-%d %H:%M:%S.%f")
     overall_end_time = time.time()
 
-    rtf = (overall_end_time - overall_start_time) / duration
+    try:
+        if duration == 0:
+            rtf = overall_end_time - overall_start_time  # 或者设置为 0，取决于你的需求
+        else:
+            rtf = (overall_end_time - overall_start_time) / duration
+    except Exception as e:
+        print(e)
+        print("duration: ", duration)
+
 
     logging.info(f"Finished at {date_time}")
     logging.info(f"Total processing time: {overall_end_time - overall_start_time:.3f} seconds")
@@ -156,7 +168,7 @@ async def process(
     Processing time: {overall_end_time - overall_start_time:.3f} s
     RTF: {overall_end_time - overall_start_time:.3f}/{duration:.3f} = {rtf:.3f}
     """
-    if rtf > 1:
+    if rtf > 1 and duration != 0:
         info += (
             "We are loading the model for the first run. "
             "Please run again to measure the real RTF."
