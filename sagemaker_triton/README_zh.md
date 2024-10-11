@@ -16,6 +16,7 @@
 
 ## 模型编译部署
 
+使用 tensorrt-llm 编译后的模型只能在编译时所在的同一类型的机器实例上部署，例如：在 g5.xlarge 上编译的模型只能在 g5 系列的机器上进行部署
 1. 克隆此仓库：
    ```
    git clone https://github.com/xqun3/whisper-sagemaker-triton.git

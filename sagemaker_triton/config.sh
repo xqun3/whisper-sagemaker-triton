@@ -2,7 +2,7 @@
 
 # 项目配置
 # PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
-PROJECT_ROOT="/home/ec2-user/SageMaker/new_test_whisper/whisper-sagemaker-triton"
+PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
 
 #注意 s3 路径最后加上 /
 S3_PATH="s3://triton-models-xq/test_1012/"
@@ -18,7 +18,7 @@ OUTPUT_MODEL_PATH="$PROJECT_ROOT/sagemaker_triton/assets/large-v3.pt"
 OPENAI_WHISPER_DOWNLOAD_URL="https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb/large-v3.pt"
 
 # LoRA 配置
-USE_LORA=true  # 设置为 true 如果需要合并 LoRA 模型
+USE_LORA=false  # 设置为 true 如果需要合并 LoRA 模型
 LORA_PATH="/home/ec2-user/SageMaker/test_whisper/lora_model/checkpoint-135"  # 仅在 USE_LORA 为 true 时使用
 
 # 其他配置
