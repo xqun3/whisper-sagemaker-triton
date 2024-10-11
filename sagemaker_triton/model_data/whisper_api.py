@@ -1,13 +1,10 @@
 # whisper_api.py
 
-import os
 import time
 from datetime import datetime
 import numpy as np
 import logging
-import requests
 import base64
-import tritonclient
 import tritonclient.grpc as grpcclient
 from tritonclient.utils import np_to_triton_dtype
 import soundfile as sf
@@ -86,6 +83,7 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
             "REPETITION_PENALTY", [1, 1], "FP32"  # Changed shape to [1, 1]
         ),
     ]
+    # logger.info(f"inputs: {inputs}")
     inputs[0].set_data_from_numpy(samples)
 
     input_data_numpy = np.array([whisper_prompt], dtype=object)

@@ -13,11 +13,13 @@ def get_bucket_and_key(s3uri):
 
 def download_folder_from_s3(source_s3_url, local_dir_path):
     s3 = boto3.client('s3')
+    print(f"s3path: {source_s3_url}")
+    print(f"download_folder: {local_dir_path}")
     bucket_name, s3_folder_path = get_bucket_and_key(source_s3_url)
-    
+
     # 确保本地目录存在
     os.makedirs(local_dir_path, exist_ok=True)
-    
+
     # 列出 S3 文件夹中的所有对象
     paginator = s3.get_paginator('list_objects_v2')
     for page in paginator.paginate(Bucket=bucket_name, Prefix=s3_folder_path):
@@ -26,10 +28,8 @@ def download_folder_from_s3(source_s3_url, local_dir_path):
             relative_path = obj['Key'][len(s3_folder_path):]
             # 构建本地文件路径
             local_file_path = os.path.join(local_dir_path, relative_path)
-            
             # 确保本地文件夹存在
             os.makedirs(os.path.dirname(local_file_path), exist_ok=True)
-            
             # 下载文件
             try:
                 s3.download_file(bucket_name, obj['Key'], local_file_path)
@@ -53,7 +53,7 @@ def main():
     print(f"Region: {region}")
 
     local_dir_path = os.path.join(args.working_dir, args.local_dir_path)
-    
+
     download_folder_from_s3(args.source_s3_url, local_dir_path)
 
 if __name__ == "__main__":

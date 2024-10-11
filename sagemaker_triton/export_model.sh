@@ -1,11 +1,16 @@
 #!/bin/bash
 set -e
+echo "Current working directory: $(pwd)"
+
+# Check if TensorRT-LLM directory exists and remove it if it does
+if [ -d "TensorRT-LLM" ]; then
+    echo "TensorRT-LLM directory already exists. Removing it..."
+    rm -rf TensorRT-LLM
+fi
 
 git clone https://github.com/NVIDIA/TensorRT-LLM.git -b v0.11.0
 cd /workspace/TensorRT-LLM/examples/whisper
 
-# take large-v3 model as an example
-# wget --directory-prefix=assets https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb/large-v3.pt
 
 INFERENCE_PRECISION=float16
 MAX_BEAM_WIDTH=4
@@ -49,3 +54,5 @@ trtllm-build --checkpoint_dir ${checkpoint_dir}/decoder \
 
 # prepare the model_repo_whisper_trtllm
 cp -r /workspace/TensorRT-LLM/examples/whisper/whisper_large_v3 /workspace/model_repo_whisper_trtllm/whisper/1/
+
+rm -rf /workspace/TensorRT-LLM
