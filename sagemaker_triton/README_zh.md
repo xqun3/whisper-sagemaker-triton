@@ -6,7 +6,6 @@
 
 该项目使用自定义 Docker 容器在 SageMaker 上部署 Whisper 模型，利用 Tensorrt-llm 对模型进行编译，提升推理速度，服务器端使用 Triton 部署。它包含了模型部署、端点创建和转录测试的脚本。
 
-
 ## 先决条件
 
 - 具有 SageMaker 访问权限的 AWS 账户
@@ -15,7 +14,7 @@
 - 配置了适当权限的 AWS CLI
 - NVIDIA GPU 支持（用于本地测试和开发）
 
-## 设置
+## 模型编译部署
 
 1. 克隆此仓库：
    ```
@@ -23,61 +22,35 @@
    cd whisper-sagemaker-triton/sagemaker_triton
    ```
 
-2. 构建并将 Docker 镜像推送到 Amazon ECR：
-   ```
-   ./build_and_push.sh
-   ```
+2. 配置部署参数：
+   编辑 `config.sh` 文件，设置以下参数：
+   - `PROJECT_ROOT`：项目根目录路径
+   - `DOCKER_IMAGE`：Docker 镜像名称
+   - `CONDA_ENV`：Conda 环境名称
+   - `USE_LORA`：是否使用 LoRA 模型（true/false）
+   - `HUGGING_FACE_MODEL_ID`：Hugging Face 模型 ID
+   - `LORA_PATH`：LoRA 模型路径（如果使用）
+   - `OUTPUT_MODEL_PATH`：输出模型路径
+   - `OPENAI_WHISPER_DOWNLOAD_URL`：OpenAI Whisper 模型下载 URL
+   - `S3_PATH`：S3 存储路径
 
-3. 合并模型（如果有用到 lora 微调模型则需要合并模型，如果没有可跳过此步）并保存成 .pt 格式，执行以下代码，模型路径参数修改为自己的路径
-
-   这里以sagemaker notebook 终端路径为例
+3. 运行准备和部署脚本：
    ```
-   # 激活 pytorch conda 环境
-   source activate pytorch_p310
-
-   # 安装相关依赖
-   pip install openai-whisper peft transformers
-   mkdir assets
-   python merge_lora.py --model-id openai/whisper-large-v3 --lora-path /path/to/lora/checkpoints --export-to /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets/large-v3.pt
+   chmod +x && ./prepare_and_deploy.sh
    ```
-
-4. 编译模型
-   - 进入容器
-   ```
-   # 将以下 docker 的挂载路径替换成上面模型所在的实际父目录
-   docker run --rm -it --net host --shm-size=2g --gpus all \
-      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/assets:/workspace/assets/ \
-      -v /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/:/workspace/ \
-      sagemaker-endpoint/whisper-triton-byoc:latest /bin/bash
-   ```
-
+   此脚本会自动执行以下步骤：
+   - 构建并推送 Docker 镜像到 Amazon ECR
+   - 准备模型（下载或合并 LoRA 模型）
    - 编译模型
+   - 上传编译后的模型到 S3
+   - 修改模型部署脚本
 
-   进入 docker 环境后编译模型， 需要使用合并后的 whisper 模型，如果是希望部署原始模型，则需要使用 `wget --directory-prefix=assets https://openaipublic.azureedge.net/main/whisper/models/e5b1a55b89c1367dacf97e3e19bfd829a01529dbfdeefa8caeb59b3f1b81dadb/large-v3.pt` 下载 whisper 模型再编译
+4. 模型部署：
+   - 在 SageMaker Studio、Jupyter 或已配置好能够访问 AWS 服务的本地机器上打开 `deploy_and_test_preprocessed.ipynb` notebook
+   - 按照 notebook 中的代码执行部署
 
-   ```
-   bash export_model.sh
-   ```
-
-5. 上传编译后的模型到 S3
-
-   编译完成后，退出镜像，将编译后的模型上传到 S3 并进行后续操作
-   ```
-   aws s3 sync /home/ec2-user/SageMaker/whisper-sagemaker-triton/sagemaker_triton/model_repo_whisper_trtllm/ s3://<Your S3 path>
-   ```
-
-6. 模型部署
-   - 修改 model_data/start_triton_and_client.sh 文件，将其里面 s3 下载的模型路径替换成上面实际的 s3 路径
-   ```
-   python3 download_model_from_s3.py --source_s3_url <s3://<Your S3 path> --local_dir_path /model_repo_whisper_trtllm --working_dir /workspace
-   ```
-   - 然后在 SageMaker Studio 或 Jupyter 或在已配置好能够访问 aws 服务的本地机器打开 `deploy_and_test_preprocessed.ipynb` notebook
-   - 按照 `deploy_and_test_preprocessed.ipynb` notebook 中的代码执行部署
-
-7. 调用测试
-
-   部署后，您可以使用 SageMaker 端点进行转录。notebook 中包含了转录音频文件的示例代码，同时也可以参考 [inference.py](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/inference.py) 进行调用
-
+5. 调用测试：
+   部署后，您可以使用 SageMaker 端点进行转录。notebook 中包含了转录音频文件的示例代码，同时也可以参考 [test_whisper_api.py](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/test_whisper_api.py) 进行调用
 
 ## Docker 镜像
 
@@ -92,7 +65,7 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 
 该项目所需的关键 Python 包包括：
 
-- sagemaker 和 sagemaker-ssh-helper，用于 SageMaker 集成
+- sagemaker 和 sagemaker-ssh-helper（可选），用于 SageMaker 集成
 - boto3，用于 AWS SDK
 - openai-whisper，用于 Whisper ASR 模型
 - tritonclient[grpc]，用于 Triton 推理服务器客户端
@@ -103,18 +76,20 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 
 ## 关键组件
 
-- `deploy_and_test_preprocessed.ipynb`：用于部署和测试的主要笔记本
+- `prepare_and_deploy.sh`：自动化准备和部署过程的主脚本
+- `config.sh`：配置文件，包含部署所需的各种参数
+- `deploy_and_test_preprocessed.ipynb`：用于发起模型在 SageMaker endpoint 的部署和测试
 - `Dockerfile.server`：定义用于 SageMaker 部署的自定义容器
-- `model_data/`：包含 Triton 服务器设置和客户端交互的脚本
-- `requirements.txt`：列出 Python 依赖项
+- `model_data/`：用于 SageMaker endpoint 部署代码
+- `requirements.txt`：Python 依赖项
 - `build_and_push.sh`：构建并将 Docker 镜像推送到 ECR 的脚本
 - `serve`：Docker 容器的入口脚本
 
 ## 自定义
 
 您可以通过修改以下内容来自定义部署：
-- 笔记本中的 Whisper 模型版本（默认为 whisper-large-v3）
-- 部署的实例类型（默认为 ml.g5.4xlarge）
+- `config.sh` 中的部署参数
+- SageMkaer endpoint 的实例类型（默认为 ml.g5.4xlarge）
 - 解码方法和其他推理参数
 - `Dockerfile.server` 中的 Docker 镜像配置
 
