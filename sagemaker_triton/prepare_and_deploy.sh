@@ -22,6 +22,7 @@ check_status() {
     fi
 }
 
+echo "当前的项目路径" $PROJECT_ROOT
 # 步骤1: 构建并推送Docker镜像
 echo "开始构建并推送Docker镜像..."
 cd "$PROJECT_ROOT/sagemaker_triton" && ./build_and_push.sh "$DOCKER_IMAGE"
@@ -35,7 +36,7 @@ check_status "依赖项安装"
 
 mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
 
-if [ "$USE_LORA" = true ]; then
+if [ "${USE_LORA,,}" = "true" ]; then
     echo "合并 LoRA 模型..."
     python merge_lora.py --model-id "$HUGGING_FACE_MODEL_ID" --lora-path "$LORA_PATH" --export-to "$OUTPUT_MODEL_PATH"
     check_status "LoRA 模型合并"
@@ -44,7 +45,7 @@ else
         echo "模型文件 $OUTPUT_MODEL_PATH 已存在，跳过下载步骤。"
     else
         echo "下载原始 Whisper 模型..."
-        wget $OPENAI_WHISPER_DOWNLOAD_URL $OUTPUT_MODEL_PATH
+        wget --directory-prefix=assets $OPENAI_WHISPER_DOWNLOAD_URL
     fi
 fi
 

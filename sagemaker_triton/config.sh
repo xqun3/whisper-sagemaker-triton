@@ -4,7 +4,7 @@
 # PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
 PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
 
-#注意 s3 路径最后加上 /
+#注意 s3 路径最后加上 s3://Your-bucket/Your-tensorrt-model/
 S3_PATH="s3://triton-models-xq/test_1012/"
 
 # Docker 配置
