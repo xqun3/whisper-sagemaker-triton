@@ -37,7 +37,7 @@
 
 3. 运行准备和部署脚本：
    ```
-   chmod +x && ./prepare_and_deploy.sh
+   chmod +x ./prepare_and_deploy.sh && ./prepare_and_deploy.sh
    ```
    此脚本会自动执行以下步骤：
    - 构建并推送 Docker 镜像到 Amazon ECR
