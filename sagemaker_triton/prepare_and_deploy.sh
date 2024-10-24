@@ -34,7 +34,7 @@ source activate $CONDA_ENV || { echo "错误：无法激活 $CONDA_ENV 环境"; 
 pip install openai-whisper peft transformers
 check_status "依赖项安装"
 
-mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
+# mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
 
 if [ "${USE_LORA,,}" = "true" ]; then
     echo "合并 LoRA 模型..."
@@ -56,10 +56,20 @@ echo $DOCKER_IMAGE
 docker run --rm -it --net host --shm-size=2g --gpus all \
   -v "$PROJECT_ROOT/sagemaker_triton/assets:/workspace/assets/" \
   -v "$PROJECT_ROOT/sagemaker_triton/:/workspace/" \
-  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model.sh"
+  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model.sh $MODEL_NAME"
 check_status "模型编译"
 
 # 步骤4: 上传编译后的模型到S3
+# 检查是否提供了参数
+if [ -z "${N_MELS}" ]; then
+    echo "请提供 n_mels 的新值"
+    exit 1
+fi
+
+# 使用 sed 命令修改 config.pbtxt 文件
+sed -i 's/\(key: "n_mels".*string_value:\)"[0-9]*"/\1"'${N_MELS}'"/' $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
+echo "n_mels 的值已更新为 $N_MELS"
+
 echo "开始上传模型到S3..."
 aws s3 sync "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/" "$S3_PATH" --exclude "*/__pycache__/*"
 check_status "模型上传到S3"

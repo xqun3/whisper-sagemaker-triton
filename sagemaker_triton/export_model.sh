@@ -17,11 +17,14 @@ MAX_BEAM_WIDTH=4
 MAX_BATCH_SIZE=48
 checkpoint_dir=tllm_checkpoint
 output_dir=whisper_large_v3
+model_name=$1
+echo "模型名称: $model_name"
 
 cp -r /workspace/assets /workspace/TensorRT-LLM/examples/whisper
 
 # Convert the large-v3 openai model into trtllm compatible checkpoint.
 python3 convert_checkpoint.py \
+                --model_name $model_name \
                 --output_dir $checkpoint_dir
 
 # Build the large-v3 trtllm engines
