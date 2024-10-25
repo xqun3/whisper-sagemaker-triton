@@ -67,7 +67,8 @@ if [ -z "${N_MELS}" ]; then
 fi
 
 # 使用 sed 命令修改 config.pbtxt 文件
-sed -i 's/\(key: "n_mels".*string_value:\)"[0-9]*"/\1"'${N_MELS}'"/' $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
+sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
+head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
 echo "n_mels 的值已更新为 $N_MELS"
 
 echo "开始上传模型到S3..."
