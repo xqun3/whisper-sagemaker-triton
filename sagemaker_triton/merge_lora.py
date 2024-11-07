@@ -5,7 +5,7 @@ import re
 import torch
 import whisper
 from peft import PeftModel
-from transformers import AutoModelForSpeechSeq2Seq
+from transformers import WhisperForConditionalGeneration
 
 
 def parse_args():
@@ -17,7 +17,7 @@ def parse_args():
     parser.add_argument('--openai_model_name',
                         type=str,
                         default='large-v3',
-                        help='openai Model ID')
+                        help='Openai Model ID')
     parser.add_argument('--lora-path',
                         type=str,
                         required=True,
@@ -54,10 +54,11 @@ def hf_to_whisper_states(text):
 def main():
     args = parse_args()
 
+    print(f"Hugging face id:{args.model_id}")
     # Load HF Model
-    base_model = AutoModelForSpeechSeq2Seq.from_pretrained(
+    base_model = WhisperForConditionalGeneration.from_pretrained(
         args.model_id,
-        torch_dtype=torch.float16,
+        # torch_dtype=torch.float16,
         low_cpu_mem_usage=True,
     )
     model = PeftModel.from_pretrained(base_model, args.lora_path)
@@ -73,7 +74,7 @@ def main():
         openai_state_dict[new_key] = hf_state_dict.pop(key)
 
     # Init Whisper Model and replace model weights
-    whisper_model = whisper.load_model(args.openai_model_name, device='cpu').half()
+    whisper_model = whisper.load_model(args.openai_model_name, device='cpu')#.half()
     whisper_model.load_state_dict(openai_state_dict, strict=True)
 
     # Export
