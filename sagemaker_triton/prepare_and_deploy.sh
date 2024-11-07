@@ -34,7 +34,7 @@ source activate $CONDA_ENV || { echo "错误：无法激活 $CONDA_ENV 环境"; 
 pip install openai-whisper peft transformers
 check_status "依赖项安装"
 
-# mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
+mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
 
 if [ "${USE_LORA,,}" = "true" ]; then
     echo "合并 LoRA 模型..."
