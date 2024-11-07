@@ -40,16 +40,22 @@ class TritonPythonModel:
         self.out0_dtype = pb_utils.triton_string_to_numpy(
             output0_config['data_type'])
 
-        self.tokenizer = get_tokenizer(num_languages=100)
-        self.blank = self.tokenizer.encode(" ", allowed_special=self.tokenizer.special_tokens_set)[0]
+        # self.tokenizer = get_tokenizer(num_languages=100)
         self.device = torch.device("cuda")
-        self.init_model(self.model_config['parameters'])
-
-    def init_model(self, parameters):
+        parameters = self.model_config['parameters']
         for key,value in parameters.items():
             parameters[key] = value["string_value"]
         engine_dir = parameters["engine_dir"]
+        config_path = engine_dir+'/encoder'+'/config.json'
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+        self.num_languages = config['pretrained_config']['num_languages']
+        self.tokenizer = get_tokenizer(num_languages=self.num_languages)
+        self.blank = self.tokenizer.encode(" ", allowed_special=self.tokenizer.special_tokens_set)[0]
         n_mels = int(parameters["n_mels"])
+        self.init_model(n_mels, engine_dir)
+
+    def init_model(self, n_mels, engine_dir):
         self.model = WhisperTRTLLM(engine_dir)
         self.feature_extractor = FeatureExtractor(n_mels=n_mels)
 
@@ -84,6 +90,7 @@ class TritonPythonModel:
             in_2 = pb_utils.get_input_tensor_by_name(request, "REPETITION_PENALTY")
 
             wav = in_1.as_numpy()
+
             assert wav.shape[0] == 1, "Only support batch size 1"
             wav = torch.from_numpy(wav[0]).to(self.device)
             mel = self.feature_extractor.compute_feature(wav)
@@ -110,7 +117,6 @@ class TritonPythonModel:
         tokens = tokens.to(features.device)
         logger.info(f"features.shape: {features.shape}")
         output_ids = self.model.process_batch(features, tokens, repetition_penalty=repetition_penalty_list)
-
         results = [output_ids[i][0] for i in range(len(output_ids))]
 
         responses = []

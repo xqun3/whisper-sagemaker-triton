@@ -14,6 +14,10 @@ def parse_args():
                         type=str,
                         default='openai/whisper-large-v3',
                         help='Model ID')
+    parser.add_argument('--openai_model_name',
+                        type=str,
+                        default='large-v3',
+                        help='openai Model ID')
     parser.add_argument('--lora-path',
                         type=str,
                         required=True,

@@ -60,6 +60,9 @@ def log_mel_spectrogram(
     torch.Tensor, shape = (128, n_frames)
         A Tensor that contains the Mel spectrogram
     """
+    # 30 means 30s audio, padding to 30s
+    if 30 * 16000 > audio.shape[0]:
+        audio = F.pad(audio, (0, 30*16000 - audio.shape[0])) 
     window = torch.hann_window(n_fft).to(audio.device)
     stft = torch.stft(audio, n_fft, hop_length, window=window, return_complex=True)
     magnitudes = stft[..., :-1].abs() ** 2

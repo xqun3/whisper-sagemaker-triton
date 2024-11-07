@@ -38,7 +38,7 @@ check_status "依赖项安装"
 
 if [ "${USE_LORA,,}" = "true" ]; then
     echo "合并 LoRA 模型..."
-    python merge_lora.py --model-id "$HUGGING_FACE_MODEL_ID" --lora-path "$LORA_PATH" --export-to "$OUTPUT_MODEL_PATH"
+    python merge_lora.py --model-id "$HUGGING_FACE_MODEL_ID" --lora-path "$LORA_PATH" --export-to "$OUTPUT_MODEL_PATH" --openai_model_name "$MODEL_NAME"
     check_status "LoRA 模型合并"
 else
     if [ -f "$OUTPUT_MODEL_PATH" ]; then
