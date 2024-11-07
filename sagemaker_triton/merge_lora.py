@@ -73,7 +73,7 @@ def main():
         openai_state_dict[new_key] = hf_state_dict.pop(key)
 
     # Init Whisper Model and replace model weights
-    whisper_model = whisper.load_model('large', device='cpu').half()
+    whisper_model = whisper.load_model(args.openai_model_name, device='cpu').half()
     whisper_model.load_state_dict(openai_state_dict, strict=True)
 
     # Export
