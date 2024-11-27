@@ -54,7 +54,6 @@ echo "开始编译模型..."
 echo $PROJECT_ROOT
 echo $DOCKER_IMAGE
 docker run --rm -it --net host --shm-size=2g --gpus all \
-  -v "$PROJECT_ROOT/sagemaker_triton/assets:/workspace/assets/" \
   -v "$PROJECT_ROOT/sagemaker_triton/:/workspace/" \
   $DOCKER_IMAGE bash -c "cd /workspace && bash export_model.sh $MODEL_NAME"
 check_status "模型编译"
@@ -65,7 +64,7 @@ if [ -z "${N_MELS}" ]; then
     echo "请提供 n_mels 的新值"
     exit 1
 fi
-
+wget -nc --directory-prefix=$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/1/ https://raw.githubusercontent.com/openai/whisper/main/whisper/assets/multilingual.tiktoken
 # 使用 sed 命令修改 config.pbtxt 文件
 sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
 head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt

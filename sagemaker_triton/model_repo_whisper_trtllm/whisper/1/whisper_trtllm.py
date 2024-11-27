@@ -18,6 +18,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+import math
 
 import tensorrt_llm
 import tensorrt_llm.logger as logger
@@ -25,7 +26,6 @@ from tensorrt_llm._utils import (str_dtype_to_torch, str_dtype_to_trt,
                                  trt_dtype_to_torch)
 from tensorrt_llm.runtime import ModelConfig, SamplingConfig
 from tensorrt_llm.runtime.session import Session, TensorInfo
-
 
 class WhisperEncoding:
 
@@ -37,6 +37,10 @@ class WhisperEncoding:
         self.n_mels = config['pretrained_config']['n_mels']
         self.dtype = config['pretrained_config']['dtype']
         self.num_languages = config['pretrained_config']['num_languages']
+        #self.n_mels = config['n_mels']
+        #self.dtype = config['dtype']
+        #self.num_languages = config['num_languages']
+        #self.encoder_config = config
 
     def get_session(self, engine_dir):
         serialize_path = engine_dir / 'encoder' / 'rank0.engine'
@@ -44,21 +48,36 @@ class WhisperEncoding:
             session = Session.from_serialized_engine(f.read())
         return session
 
-    def get_audio_features(self, mel):
-
-        input_lengths = torch.tensor(
-            [mel.shape[2] // 2 for _ in range(mel.shape[0])],
+    def get_audio_features(self,
+                           mel,
+                           mel_input_lengths,
+                           encoder_downsampling_factor=2):
+        if isinstance(mel, list):
+            longest_mel = max([f.shape[-1] for f in mel])
+            mel = [
+                torch.nn.functional.pad(f, (0, longest_mel - f.shape[-1]),
+                                        mode='constant') for f in mel
+            ]
+            mel = torch.cat(mel, dim=0).type(
+                str_dtype_to_torch("float16")).contiguous()
+        bsz, seq_len = mel.shape[0], mel.shape[2]
+        position_ids = torch.arange(
+            math.ceil(seq_len / encoder_downsampling_factor),
             dtype=torch.int32,
-            device=mel.device)
+            device=mel.device).expand(bsz, -1).contiguous()
 
         inputs = OrderedDict()
-        inputs['x'] = mel
-        inputs['input_lengths'] = input_lengths
+        inputs['input_features'] = mel
+        inputs['input_lengths'] = mel_input_lengths
+        inputs['position_ids'] = position_ids
 
         output_list = [
-            TensorInfo('x', str_dtype_to_trt(self.dtype), mel.shape),
+            TensorInfo('input_features', str_dtype_to_trt(self.dtype),
+                       mel.shape),
             TensorInfo('input_lengths', str_dtype_to_trt('int32'),
-                       input_lengths.shape)
+                       mel_input_lengths.shape),
+            TensorInfo('position_ids', str_dtype_to_trt('int32'),
+                       inputs['position_ids'].shape)
         ]
 
         output_info = (self.session).infer_shapes(output_list)
@@ -76,8 +95,62 @@ class WhisperEncoding:
                               stream=stream.cuda_stream)
         assert ok, 'Engine execution failed'
         stream.synchronize()
-        audio_features = outputs['output']
-        return audio_features
+        encoder_output = outputs['encoder_output']
+        encoder_output_lengths = mel_input_lengths // encoder_downsampling_factor
+        return encoder_output, encoder_output_lengths
+
+
+# class WhisperEncoding:
+# 
+#     def __init__(self, engine_dir):
+#         self.session = self.get_session(engine_dir)
+#         config_path = engine_dir / 'encoder' / 'config.json'
+#         with open(config_path, 'r') as f:
+#             config = json.load(f)
+#         self.n_mels = config['pretrained_config']['n_mels']
+#         self.dtype = config['pretrained_config']['dtype']
+#         self.num_languages = config['pretrained_config']['num_languages']
+# 
+#     def get_session(self, engine_dir):
+#         serialize_path = engine_dir / 'encoder' / 'rank0.engine'
+#         with open(serialize_path, 'rb') as f:
+#             session = Session.from_serialized_engine(f.read())
+#         return session
+# 
+#     def get_audio_features(self, mel):
+# 
+#         input_lengths = torch.tensor(
+#             [mel.shape[2] // 2 for _ in range(mel.shape[0])],
+#             dtype=torch.int32,
+#             device=mel.device)
+# 
+#         inputs = OrderedDict()
+#         inputs['x'] = mel
+#         inputs['input_lengths'] = input_lengths
+# 
+#         output_list = [
+#             TensorInfo('x', str_dtype_to_trt(self.dtype), mel.shape),
+#             TensorInfo('input_lengths', str_dtype_to_trt('int32'),
+#                        input_lengths.shape)
+#         ]
+# 
+#         output_info = (self.session).infer_shapes(output_list)
+# 
+#         logger.debug(f'output info {output_info}')
+#         outputs = {
+#             t.name: torch.empty(tuple(t.shape),
+#                                 dtype=trt_dtype_to_torch(t.dtype),
+#                                 device='cuda')
+#             for t in output_info
+#         }
+#         stream = torch.cuda.current_stream()
+#         ok = self.session.run(inputs=inputs,
+#                               outputs=outputs,
+#                               stream=stream.cuda_stream)
+#         assert ok, 'Engine execution failed'
+#         stream.synchronize()
+#         audio_features = outputs['output']
+#         return audio_features
 
 
 class WhisperDecoding:
@@ -130,6 +203,7 @@ class WhisperDecoding:
     def generate(self,
                  decoder_input_ids,
                  encoder_outputs,
+                 encoder_max_input_length,
                  eot_id,
                  max_new_tokens=40,
                  num_beams=1,
@@ -147,8 +221,8 @@ class WhisperDecoding:
         decoder_max_input_length = torch.max(decoder_input_lengths).item()
 
         cross_attention_mask = torch.ones(
-            [encoder_outputs.shape[0], 1,
-             encoder_outputs.shape[1]]).int().cuda()
+            [decoder_input_ids.shape[0], decoder_max_input_length + max_new_tokens,
+             encoder_max_input_length]).int().cuda()
 
         # Add debug logging
         logger.debug(f"Repetition penalty in generate: {repetition_penalty}")
@@ -217,6 +291,7 @@ class WhisperTRTLLM(object):
     def process_batch(
             self,
             mel,
+            mel_input_lengths,
             decoder_input_ids,
             eot_id=50257,
             max_new_tokens=96,
@@ -238,9 +313,13 @@ class WhisperTRTLLM(object):
 
         logger.debug(f"Repetition penalty after conversion in process_batch: {repetition_penalty}")
         
-        encoder_output = self.encoder.get_audio_features(mel)
+        # encoder_output = self.encoder.get_audio_features(mel)
+        encoder_output, encoder_output_lengths = self.encoder.get_audio_features(
+                mel, mel_input_lengths)
+        encoder_max_input_length = torch.max(encoder_output_lengths).item()
         output_ids = self.decoder.generate(decoder_input_ids,
                                            encoder_output,
+                                           encoder_max_input_length,
                                            eot_id,
                                            max_new_tokens=max_new_tokens,
                                            num_beams=num_beams,

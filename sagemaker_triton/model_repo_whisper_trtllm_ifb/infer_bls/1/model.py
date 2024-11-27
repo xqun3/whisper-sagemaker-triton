@@ -3,12 +3,20 @@ import triton_python_backend_utils as pb_utils
 import numpy as np
 import json
 import torch
-from torch.utils.dlpack import from_dlpack, to_dlpack
+from torch.utils.dlpack import to_dlpack
 import re
 from .tokenizer import get_tokenizer
-from .whisper_trtllm import WhisperTRTLLM
-import tensorrt_llm.logger as logger
-from .fbank import FeatureExtractor
+from collections import OrderedDict
+from pathlib import Path
+
+def read_config(component, engine_dir):
+    config_path = engine_dir / component / 'config.json'
+    with open(config_path, 'r') as f:
+        config = json.load(f)
+    model_config = OrderedDict()
+    model_config.update(config['pretrained_config'])
+    model_config.update(config['build_config'])
+    return model_config
 
 class TritonPythonModel:
     """Your Python model must use the same class name. Every Python model
@@ -39,26 +47,30 @@ class TritonPythonModel:
         # Convert Triton types to numpy types
         self.out0_dtype = pb_utils.triton_string_to_numpy(
             output0_config['data_type'])
-
-        # self.tokenizer = get_tokenizer(num_languages=100)
-        self.device = torch.device("cuda")
-        parameters = self.model_config['parameters']
-        for key,value in parameters.items():
-            parameters[key] = value["string_value"]
-        engine_dir = parameters["engine_dir"]
-        config_path = engine_dir+'/encoder'+'/config.json'
-        with open(config_path, 'r') as f:
-            config = json.load(f)
-        self.num_languages = config['pretrained_config']['num_languages']
-        self.tokenizer = get_tokenizer(num_languages=self.num_languages)
+        encoder_config = read_config('encoder', Path(self.model_config['parameters']['engine_dir']["string_value"]))
+        self.tokenizer = get_tokenizer(num_languages=encoder_config['num_languages'])
         self.blank = self.tokenizer.encode(" ", allowed_special=self.tokenizer.special_tokens_set)[0]
-        n_mels = int(parameters["n_mels"])
-        self.init_model(n_mels, engine_dir)
+        self.device = torch.device("cuda")
 
-    def init_model(self, n_mels, engine_dir):
-        self.model = WhisperTRTLLM(engine_dir)
-        self.feature_extractor = FeatureExtractor(n_mels=n_mels)
+    def process_batch(self, wav, wav_len, prompt_id):
+        wav = torch.from_numpy(wav[0]).to(self.device)
+        wav_tensor = pb_utils.Tensor.from_dlpack("WAV", to_dlpack(wav.unsqueeze(0)))
+        wav_len_tensor = pb_utils.Tensor("WAV_LENS", np.array([[wav_len]], np.int32))
+        prompt_id = torch.tensor(prompt_id).unsqueeze(0)
 
+        prompt_id = pb_utils.Tensor("DECODER_INPUT_IDS", prompt_id.numpy().astype(np.int32))
+        infer_request = pb_utils.InferenceRequest(
+            model_name="whisper",
+            requested_output_names=["OUTPUT_IDS"],
+            inputs=[wav_tensor, wav_len_tensor, prompt_id]
+        )
+        inference_response = infer_request.exec()
+        if inference_response.has_error():
+            raise pb_utils.TritonModelException(inference_response.error().message())
+        else:
+            output_ids = pb_utils.get_output_tensor_by_name(inference_response, "OUTPUT_IDS")
+            return output_ids.as_numpy()
+        
     def execute(self, requests):
         """`execute` must be implemented in every Python model. `execute`
         function receives a list of pb_utils.InferenceRequest as the only
@@ -82,51 +94,23 @@ class TritonPythonModel:
         # as they will be overridden in subsequent inference requests. You can
         # make a copy of the underlying NumPy array and store it if it is
         # required.
-        mel_list, text_prefix_list, repetition_penalty_list = [], [], []
+        responses = []
         for request in requests:
             # Perform inference on the request and append it to responses list...
             in_0 = pb_utils.get_input_tensor_by_name(request, "TEXT_PREFIX")
-            in_1 = pb_utils.get_input_tensor_by_name(request, "WAV")
-            in_2 = pb_utils.get_input_tensor_by_name(request, "REPETITION_PENALTY")
+            prompt_ids = in_0.as_numpy().tolist()
+            prompt_ids = prompt_ids[0][0].decode('utf-8')
+            if prompt_ids == "":
+                prompt_ids = "<|startoftranscript|><|en|><|transcribe|><|notimestamps|>"
+            prompt_id = self.tokenizer.encode(prompt_ids, allowed_special=self.tokenizer.special_tokens_set)
 
-            wav = in_1.as_numpy()
+            wav = pb_utils.get_input_tensor_by_name(request, "WAV").as_numpy()
+            assert wav.shape[0] == 1, "Only support batch size 1 for now"
+            wav_len = pb_utils.get_input_tensor_by_name(request, "WAV_LENS").as_numpy()
+            wav_len = wav_len.item()
 
-            assert wav.shape[0] == 1, "Only support batch size 1"
-            wav = torch.from_numpy(wav[0]).to(self.device)
-            mel = self.feature_extractor.compute_feature(wav)
-            mel_list.append(mel)
-
-            text_prefix_list.append(in_0.as_numpy().tolist())
-            repetition_penalty_list.append(in_2.as_numpy()[0])
-
-        # concat tensors in batch dimension
-        features = torch.cat(mel_list, dim=0)
-        features = features.to(self.device)
-        features_input_lengths = torch.full((features.shape[0], ),
-                                        features.shape[2],
-                                        dtype=torch.int32,
-                                        device=features.device)
-
-        prompt_ids = []
-        for text_prefix in text_prefix_list:
-            text_prefix = text_prefix[0][0].decode('utf-8')
-            if text_prefix == "":
-                text_prefix = "<|startoftranscript|><|en|><|transcribe|><|notimestamps|>"
-            prompt_id = self.tokenizer.encode(text_prefix, allowed_special=self.tokenizer.special_tokens_set)
-            # convert prompt_id to tensor, tensor shape is [Seq]
-            prompt_id = torch.tensor(prompt_id)
-            prompt_ids.append(prompt_id)
-        # convert prompt_ids to tensor, tensor shape is [Batch, Seq], left padding with self.blank
-        tokens = torch.nn.utils.rnn.pad_sequence(prompt_ids, batch_first=True, padding_value=self.blank)
-        tokens = tokens.to(features.device)
-        logger.info(f"features.shape: {features.shape}")
-        output_ids = self.model.process_batch(features, features_input_lengths, tokens, repetition_penalty=repetition_penalty_list)
-        results = [output_ids[i][0] for i in range(len(output_ids))]
-
-        responses = []
-        for result in results:
-            s = self.tokenizer.decode(result)
-            s = re.sub(r"<\|startofprev\|>.*?<\|startoftranscript\|>", '', s)
+            output_ids = self.process_batch(wav, wav_len, prompt_id)
+            s = self.tokenizer.decode(output_ids)
             s = re.sub(r'<\|.*?\|>', '', s)
             sentence = np.array([s])
             out0 = pb_utils.Tensor("TRANSCRIPTS", sentence.astype(self.out0_dtype))

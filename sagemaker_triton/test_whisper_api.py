@@ -90,9 +90,9 @@ if __name__ == "__main__":
     parser.add_argument("--repetition_penalty", type=float, default=1.0, help="Repetition penalty")
     
     args = parser.parse_args()
-    args.url ="http://127.0.0.1:30005"
+    args.url ="http://127.0.0.1:8080"
     print("Testing Ping...")
-    test_ping("http://127.0.0.1:30005")
+    test_ping(args.url)
 
     
     print("Testing Transcription...")
