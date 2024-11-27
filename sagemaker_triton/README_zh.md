@@ -47,7 +47,7 @@
    - 修改模型部署脚本
 
 4. 模型部署：
-   - 在 SageMaker Studio、Jupyter 或已配置好能够访问 AWS 服务的本地机器上打开 `deploy_and_test_preprocessed.ipynb` notebook
+   - 在 SageMaker Studio、Jupyter 或已配置好能够访问 AWS 服务的本地机器上打开 [deploy_and_test.ipynb](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/deploy_and_test.ipynb) notebook
    - 按照 notebook 中的代码执行部署
 
 5. 调用测试：
@@ -79,7 +79,7 @@ Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:
 
 - `prepare_and_deploy.sh`：自动化准备和部署过程的主脚本
 - `config.sh`：配置文件，包含部署所需的各种参数
-- `deploy_and_test_preprocessed.ipynb`：用于发起模型在 SageMaker endpoint 的部署和测试
+- `deploy_and_test.ipynb`：用于发起模型在 SageMaker endpoint 的部署和测试
 - `Dockerfile.server`：定义用于 SageMaker 部署的自定义容器
 - `model_data/`：用于 SageMaker endpoint 部署代码
 - `requirements.txt`：Python 依赖项
