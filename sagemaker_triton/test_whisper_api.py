@@ -1,34 +1,14 @@
-#test_whisper_api.py
 import requests
 import base64
 import json
 import argparse
-
-import os
 import time
-from datetime import datetime
-import numpy as np
-import logging
-import requests
-import base64
-import tritonclient.http as httpclient
-from tritonclient.utils import np_to_triton_dtype
-import soundfile as sf
 import io
-from fastapi import FastAPI, Request, HTTPException, Response
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, parse_obj_as
-import asyncio
-import aiohttp
-from fastapi import FastAPI, Request
-import httpx
-from fastapi.responses import StreamingResponse
-from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+import statistics
+import librosa
+import soundfile as sf
 from pydub import AudioSegment
-
-# def encode_audio(audio_file_path):
-#     with open(audio_file_path, "rb") as audio_file:
-#         return base64.b64encode(audio_file.read()).decode('utf-8')
 
 def encode_audio(audio_file_path):
     # 加载音频文件
@@ -55,13 +35,20 @@ def test_ping(base_url):
     print(f"Status Code: {response.status_code}")
     print()
 
-def test_transcription(base_url, audio_file_path, language="", repo_id="whisper-large-v3", decoding_method="greedy_search", whisper_prompt="",repetition_penalty=1):
+def test_transcription(base_url, audio_file_path, language="", repo_id="whisper-large-v3", 
+                      decoding_method="greedy_search", whisper_prompt="", 
+                      repetition_penalty=1, max_new_tokens=96):
     encoded_audio = encode_audio(audio_file_path)
-    
+    # payload = {
+    #     "language": language,
+    #     "repo_id": repo_id,
+    #     "decoding_method": decoding_method,
+    #     "whisper_prompt": whisper_prompt,
+    #     "audio_data": encoded_audio,
+    #     "repetition_penalty": repetition_penalty
+    # } 
     payload = {
-        "language": language,
-        "repo_id": repo_id,
-        "decoding_method": decoding_method,
+        "max_new_tokens": max_new_tokens,
         "whisper_prompt": whisper_prompt,
         "audio_data": encoded_audio,
         "repetition_penalty": repetition_penalty
@@ -71,13 +58,42 @@ def test_transcription(base_url, audio_file_path, language="", repo_id="whisper-
         "Content-Type": "application/json"
     }
     
+    start_time = time.time()
     response = requests.post(f"{base_url}/invocations", json=payload, headers=headers)
+    latency = (time.time() - start_time) * 1000  # Convert to milliseconds
     
-    print("Transcription Response:")
-    print(json.dumps(response.json(), indent=2, ensure_ascii=False))
-    print(f"Status Code: {response.status_code}")
+    return response, latency
 
+def save_first_15_seconds(input_file, output_file):
+    """
+    使用 librosa 提取前15秒音频
+    
+    参数:
+    - input_file: 输入音频文件路径
+    - output_file: 输出音频文件路径
+    """
+    try:
+        # 加载音频文件，只加载前15秒
+        y, sr = librosa.load(input_file, sr=16000, duration=15)
+        
+        # 保存前15秒音频
+        sf.write(output_file, y, sr)
+        
+        print(f"Successfully extracted first 15 seconds to {output_file}")
+    
+    except Exception as e:
+        print(f"Error extracting audio: {e}")
 
+def print_statistics(latencies):
+    print("\n=== Latency Statistics (milliseconds) ===")
+    print(f"Average: {statistics.mean(latencies):.2f}ms")
+    print(f"Minimum: {min(latencies):.2f}ms")
+    print(f"Maximum: {max(latencies):.2f}ms")
+    print(f"Median: {statistics.median(latencies):.2f}ms")
+    if len(latencies) > 1:
+        print(f"Standard Deviation: {statistics.stdev(latencies):.2f}ms")
+        print(f"95th Percentile: {np.percentile(latencies, 95):.2f}ms")
+        print(f"99th Percentile: {np.percentile(latencies, 99):.2f}ms")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test Whisper API")
@@ -88,15 +104,57 @@ if __name__ == "__main__":
     parser.add_argument("--decoding_method", type=str, default="greedy_search", help="Decoding method")
     parser.add_argument("--prompt", type=str, default="", help="Whisper prompt (optional)")
     parser.add_argument("--repetition_penalty", type=float, default=1.0, help="Repetition penalty")
+    parser.add_argument("--max_new_tokens", type=int, default=96, help="Numbers of generate new tokens")
+    parser.add_argument("--num_requests", type=int, default=1, help="Number of requests to send")
+    parser.add_argument("--interval", type=float, default=0.0, help="Interval between requests in seconds")
     
     args = parser.parse_args()
-    args.url ="http://127.0.0.1:30005"
-    print("Testing Ping...")
-    test_ping("http://127.0.0.1:30005")
 
+    print("Testing Ping...")
+    test_ping(args.url)
+
+    print(f"\nSending {args.num_requests} requests with {args.interval}s interval...")
+    latencies = []
     
-    print("Testing Transcription...")
-    encoded_audio = encode_audio(args.audio)
-    # args.prompt = "<|startofprev|>This is MOBA game text<|startoftranscript|><|zh|><|transcribe|><|notimestamps|>"
-    # text = process(args.language, args.repo_id, args.decoding_method, args.prompt, encoded_audio)
-    test_transcription(args.url, args.audio, args.language, args.repo_id, args.decoding_method, args.prompt, args.repetition_penalty)
+    
+        
+    # from datasets import load_dataset
+    # import os
+    # from pathlib import Path
+    # data = load_dataset("hf-internal-testing/librispeech_asr_dummy")
+    # # args.audio = data["validation"]["file"][0]
+    # # 原始路径
+    # original_path = data["validation"]["file"][0]
+
+    # # 获取当前用户的home目录
+    # current_user_home = str(Path.home())
+
+    # # 替换路径中的用户名部分
+    # args.audio = original_path.replace("/Users/sanchitgandhi", current_user_home)
+
+    # print(f"Original path: {original_path}")
+    # print(f"New path: {args.audio}")
+    output_audio = "first_15_seconds.wav"
+    save_first_15_seconds(args.audio, output_audio)
+    
+    for i in range(args.num_requests):
+        print(f"\nRequest {i+1}/{args.num_requests}:")
+        response, latency = test_transcription(
+            args.url, output_audio, args.language, args.repo_id,
+            args.decoding_method, args.prompt, args.repetition_penalty,
+            args.max_new_tokens
+        )
+        
+        print("Transcription Response:")
+        print(json.dumps(response.json(), indent=2, ensure_ascii=False))
+        print(f"Status Code: {response.status_code}")
+        print(f"Request Latency: {latency:.2f}ms")
+        
+        latencies.append(latency)
+        
+        # Sleep for the specified interval if not the last request
+        if i < args.num_requests - 1 and args.interval > 0:
+            time.sleep(args.interval)
+    
+    # Print timing statistics
+    print_statistics(latencies)

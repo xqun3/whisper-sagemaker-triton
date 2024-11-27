@@ -1,6 +1,7 @@
 # whisper_api.py
 
 import time
+import torch
 from datetime import datetime
 import numpy as np
 import logging
@@ -28,12 +29,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class InferenceOpt(BaseModel):
-    language: str = Field(default="")
-    repo_id: str = Field(default="whisper-large-v3")
-    decoding_method: str = Field(default="greedy_search")
     whisper_prompt: str = Field(default="")
     audio_data: str = Field(...)  # Base64 encoded audio data
-    repetition_penalty: float = Field(default=1.0)  # New field for repetition penalty
+    repetition_penalty: float = Field(default=1.0)  # Field for repetition penalty
+    max_new_tokens: int = Field(default=2)  # New field for max_new_tokens
 
 # 创建一个线程池来管理Triton客户端连接
 triton_client_pool = ThreadPoolExecutor(max_workers=10)
@@ -44,7 +43,7 @@ async def get_triton_client():
         lambda: grpcclient.InferenceServerClient(url=server_url, verbose=False)
     )
 
-async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty, padding_duration=15):
+async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty, max_new_tokens, padding_duration=15):
     start_time = time.time()
     
     # Decode base64 audio data
@@ -70,33 +69,41 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
         dtype=np.float32,
     )
 
+    # torch.save(waveform, "wav.pt")
     samples[0, : len(waveform)] = waveform
-
+    lengths = np.array([[len(waveform)]], dtype=np.int32)
+    # print(lengths, flush=True)
     inputs = [
         protocol_client.InferInput(
             "WAV", samples.shape, np_to_triton_dtype(samples.dtype)
         ),
         protocol_client.InferInput(
+            "WAV_LENS", lengths.shape, np_to_triton_dtype(lengths.dtype)
+        ),
+        protocol_client.InferInput(
             "TEXT_PREFIX", [1, 1], "BYTES"
         ),
         protocol_client.InferInput(
-            "REPETITION_PENALTY", [1, 1], "FP32"  # Changed shape to [1, 1]
+            "REPETITION_PENALTY", [1, 1], "FP32"
+        ),
+        protocol_client.InferInput(
+            "MAX_NEW_TOKENS", [1, 1], "INT32"
         ),
     ]
-    # logger.info(f"inputs: {inputs}")
     inputs[0].set_data_from_numpy(samples)
+    inputs[1].set_data_from_numpy(lengths)
 
     input_data_numpy = np.array([whisper_prompt], dtype=object)
     input_data_numpy = input_data_numpy.reshape((1, 1))
-    inputs[1].set_data_from_numpy(input_data_numpy)
+    inputs[2].set_data_from_numpy(input_data_numpy)
 
-    # Create repetition_penalty as a 2D array with shape [1, 1]
+    # Set repetition_penalty as a 2D array with shape [1, 1]
     repetition_penalty_array = np.array([[repetition_penalty]], dtype=np.float32)
-    logger.info(f"Repetition penalty array shape: {repetition_penalty_array.shape}")
-    logger.info(f"Repetition penalty array: {repetition_penalty_array}")
-    
-    inputs[2].set_data_from_numpy(repetition_penalty_array)
-    logger.info(f"Repetition penalty input shape after set_data_from_numpy: {inputs[2].shape()}")
+    inputs[3].set_data_from_numpy(repetition_penalty_array)
+
+    # Set max_new_tokens as a 2D array with shape [1, 1]
+    max_new_tokens_array = np.array([[max_new_tokens]], dtype=np.int32)
+    inputs[4].set_data_from_numpy(max_new_tokens_array)
 
     outputs = [protocol_client.InferRequestedOutput("TRANSCRIPTS")]
     sequence_id = np.random.randint(0, 1000000)
@@ -119,29 +126,25 @@ async def send_whisper(whisper_prompt, audio_data, model_name, repetition_penalt
     return decoding_results, duration
 
 async def process(
-    language: str,
-    repo_id: str,
-    decoding_method: str,
     whisper_prompt: str,
     audio_data: str,
     repetition_penalty: float,
+    max_new_tokens: int,
 ):
     overall_start_time = time.time()
 
-    logging.info(f"language: {language}")
-    logging.info(f"repo_id: {repo_id}")
-    logging.info(f"decoding_method: {decoding_method}")
     logging.info(f"whisper_prompt: {whisper_prompt}")
     logging.info(f"repetition_penalty: {repetition_penalty}")
+    logging.info(f"max_new_tokens: {max_new_tokens}")
 
-    model_name = "whisper"
+    model_name = "infer_bls"
 
     now = datetime.now()
     date_time = now.strftime("%Y-%m-%d %H:%M:%S.%f")
     logging.info(f"Started at {date_time}")
 
     whisper_start_time = time.time()
-    text, duration = await send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty)
+    text, duration = await send_whisper(whisper_prompt, audio_data, model_name, repetition_penalty, max_new_tokens)
     whisper_end_time = time.time()
 
     date_time = now.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -155,7 +158,6 @@ async def process(
     except Exception as e:
         print(e)
         print("duration: ", duration)
-
 
     logging.info(f"Finished at {date_time}")
     logging.info(f"Total processing time: {overall_end_time - overall_start_time:.3f} seconds")
@@ -173,7 +175,7 @@ async def process(
         )
 
     logging.info(info)
-    logging.info(f"\nrepo_id: {repo_id}\nhyp: {text}")
+    logging.info(f"\nhyp: {text}")
 
     return text
 
@@ -196,9 +198,9 @@ async def invocations(request: Request):
     try:
         json_post_raw = await request.json()
         opt = parse_obj_as(InferenceOpt, json_post_raw)
-        text = await process(opt.language, opt.repo_id, opt.decoding_method, opt.whisper_prompt, opt.audio_data, opt.repetition_penalty)
+        text = await process(opt.whisper_prompt, 
+                           opt.audio_data, opt.repetition_penalty, opt.max_new_tokens)
         return JSONResponse({"code": 0, "message": "Success", "transcribe_text": text}, status_code=200)
     except Exception as e:
         logger.error(f"Error processing request: {str(e)}")
         return JSONResponse({"code": 1, "message": f"Error: {str(e)}"}, status_code=500)
-
