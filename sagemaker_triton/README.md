@@ -4,7 +4,7 @@ This project demonstrates the deployment of the Whisper Automatic Speech Recogni
 
 ## Overview
 
-The project uses a custom Docker container to deploy the Whisper model on SageMaker, leveraging the Triton Inference Server for optimized inference. It includes scripts for model deployment, endpoint creation, and transcription testing.
+The project uses a custom Docker container to deploy the Whisper model on SageMaker, leveraging TensorRT-LLM for model compilation and optimization, with Triton Inference Server for deployment. It includes scripts for model deployment, endpoint creation, and transcription testing.
 
 ## Prerequisites
 
@@ -14,18 +14,45 @@ The project uses a custom Docker container to deploy the Whisper model on SageMa
 - AWS CLI configured with appropriate permissions
 - NVIDIA GPU support (for local testing and development)
 
-## Setup
+## Model Compilation and Deployment
+
+Note: Models compiled with TensorRT-LLM can only be deployed on the same instance type used for compilation. For example, a model compiled on g5.xlarge can only be deployed on G5 series instances.
 
 1. Clone this repository:
    ```
-   git clone <repository-url>
+   git clone https://github.com/xqun3/whisper-sagemaker-triton.git
    cd whisper-sagemaker-triton/sagemaker_triton
    ```
 
-2. Build and push the Docker image to Amazon ECR:
+2. Configure deployment parameters:
+   Edit the `config.sh` file to set the following parameters:
+   - `PROJECT_ROOT`: Project root directory path
+   - `DOCKER_IMAGE`: Docker image name
+   - `CONDA_ENV`: Conda environment name
+   - `USE_LORA`: Whether to use LoRA model (true/false)
+   - `HUGGING_FACE_MODEL_ID`: Hugging Face model ID
+   - `LORA_PATH`: LoRA model path (if using)
+   - `OUTPUT_MODEL_PATH`: Output model path
+   - `OPENAI_WHISPER_DOWNLOAD_URL`: OpenAI Whisper model download URL
+   - `S3_PATH`: S3 storage path
+
+3. Run the preparation and deployment script:
    ```
-   ./build_and_push.sh
+   chmod +x ./prepare_and_deploy.sh && ./prepare_and_deploy.sh
    ```
+   This script will automatically:
+   - Build and push the Docker image to Amazon ECR
+   - Prepare the model (download or merge LoRA model)
+   - Compile the model
+   - Upload the compiled model to S3
+   - Modify model deployment scripts
+
+4. Model Deployment:
+   - Open the [deploy_and_test.ipynb](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/deploy_and_test.ipynb) notebook in SageMaker Studio, Jupyter, or a local machine configured with AWS access
+   - Follow the deployment code in the notebook
+
+5. Testing:
+   After deployment, you can use the SageMaker endpoint for transcription. The notebook includes example code for transcribing audio files, and you can also refer to [test_whisper_api.py](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/test_whisper_api.py) for API usage.
 
 ## Docker Image
 
@@ -40,7 +67,7 @@ The Docker image is based on the NVIDIA Triton Server image (nvcr.io/nvidia/trit
 
 Key Python packages required for this project include:
 
-- sagemaker and sagemaker-ssh-helper for SageMaker integration
+- sagemaker and sagemaker-ssh-helper (optional) for SageMaker integration
 - boto3 for AWS SDK
 - openai-whisper for the Whisper ASR model
 - tritonclient[grpc] for Triton Inference Server client
@@ -49,31 +76,13 @@ Key Python packages required for this project include:
 
 For a complete list, refer to the `requirements.txt` file.
 
-## Deployment
-
-1. Open the `deploy_and_test_preprocessed.ipynb` notebook in SageMaker Studio or Jupyter.
-
-2. Follow the notebook steps to:
-   - Configure SageMaker session and roles
-   - Upload the model artifacts to S3
-   - Deploy the model to a SageMaker endpoint
-
-## Usage
-
-After deployment, you can use the SageMaker endpoint for transcription. The notebook includes example code for transcribing audio files:
-
-```python
-audio_path = "./English_04.wav"
-endpoint_name = "<your-endpoint-name>"
-result = transcribe_audio(audio_path, endpoint_name)
-print(result)
-```
-
 ## Key Components
 
-- `deploy_and_test_preprocessed.ipynb`: Main notebook for deployment and testing
+- `prepare_and_deploy.sh`: Main script for automating preparation and deployment process
+- `config.sh`: Configuration file containing various deployment parameters
+- `deploy_and_test.ipynb`: Notebook for initiating model deployment on SageMaker endpoint and testing
 - `Dockerfile.server`: Defines the custom container for SageMaker deployment
-- `model_data/`: Contains scripts for Triton server setup and client interactions
+- `model_data/`: Contains scripts for SageMaker endpoint deployment
 - `requirements.txt`: Lists Python dependencies
 - `build_and_push.sh`: Script to build and push the Docker image to ECR
 - `serve`: Entry point script for the Docker container
@@ -81,8 +90,8 @@ print(result)
 ## Customization
 
 You can customize the deployment by modifying:
-- The Whisper model version in the notebook (default is whisper-large-v3)
-- Instance type for deployment (default is ml.g5.xlarge)
+- Deployment parameters in `config.sh`
+- Instance type for SageMaker endpoint (default is ml.g5.4xlarge)
 - Decoding method and other inference parameters
 - Docker image configuration in `Dockerfile.server`
 

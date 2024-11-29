@@ -2,8 +2,7 @@
 
 # 项目配置
 # PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
-# PROJECT_ROOT="/home/ec2-user/SageMaker/test_wehisper3/whisper-sagemaker-triton"
-PROJECT_ROOT="/home/dongxq/project/whisper/whisper-sagemaker-triton"
+PROJECT_ROOT="/home/ec2-user/SageMaker/whisper-sagemaker-triton"
 
 #注意 s3 路径最后加上 /
 S3_PATH="s3://triton-models-xq/test_turbo/"
@@ -12,7 +11,7 @@ S3_PATH="s3://triton-models-xq/test_turbo/"
 # Docker 配置
 ## 注意：如果修了docker image 的值，也需要同步修改 deploy_and_test_preprocessed.ipynb 文件里的镜像地址
 ## 默认的 image url 会是: ${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${DOCKER_IMAGE}
-DOCKER_IMAGE="sagemaker-endpoint/whisper-triton-byoc:latest"
+DOCKER_IMAGE="sagemaker-endpoint/whisper-triton-byoc-infl:latest"
 
 # 模型配置
 # MODEL_NAME="base"

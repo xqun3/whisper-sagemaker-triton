@@ -42,11 +42,12 @@ if [ "${USE_LORA,,}" = "true" ]; then
     check_status "LoRA 模型合并"
 else
     if [ -f "$OUTPUT_MODEL_PATH" ]; then
-        echo "模型文件 $OUTPUT_MODEL_PATH 已存在，跳过下载步骤。"
-    else
-        echo "下载原始 Whisper 模型..."
-        wget --directory-prefix=assets $OPENAI_WHISPER_DOWNLOAD_URL
+        echo "模型文件 $OUTPUT_MODEL_PATH 已存在，删除原文件"
+        rm -rf $OUTPUT_MODEL_PATH 
     fi
+    echo "下载原始 Whisper 模型..."
+    wget --directory-prefix=assets $OPENAI_WHISPER_DOWNLOAD_URL
+    
 fi
 
 # 步骤3: 编译模型
@@ -55,7 +56,7 @@ echo $PROJECT_ROOT
 echo $DOCKER_IMAGE
 docker run --rm -it --net host --shm-size=2g --gpus all \
   -v "$PROJECT_ROOT/sagemaker_triton/:/workspace/" \
-  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model.sh $MODEL_NAME"
+  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model_c.sh $MODEL_NAME"
 check_status "模型编译"
 
 # 步骤4: 上传编译后的模型到S3
@@ -64,14 +65,22 @@ if [ -z "${N_MELS}" ]; then
     echo "请提供 n_mels 的新值"
     exit 1
 fi
+<<<<<<< HEAD
 wget -nc --directory-prefix=$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/1/ https://raw.githubusercontent.com/openai/whisper/main/whisper/assets/multilingual.tiktoken
 # 使用 sed 命令修改 config.pbtxt 文件
 sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
 head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
 echo "n_mels 的值已更新为 $N_MELS"
+=======
+
+# # 使用 sed 命令修改 config.pbtxt 文件
+# sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
+# head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
+# echo "n_mels 的值已更新为 $N_MELS"
+>>>>>>> add09c4551fc070f52c6b4d6d012825de44b9797
 
 echo "开始上传模型到S3..."
-aws s3 sync "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/" "$S3_PATH" --exclude "*/__pycache__/*"
+aws s3 sync "$PROJECT_ROOT/sagemaker_triton/whisper_trt/" "$S3_PATH" --exclude "*/__pycache__/*"
 check_status "模型上传到S3"
 
 # 步骤5: 修改模型部署脚本

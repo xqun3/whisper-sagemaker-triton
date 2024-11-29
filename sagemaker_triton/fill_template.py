@@ -1,3 +1,7 @@
+<<<<<<< HEAD
+=======
+#! /usr/bin/env python3
+>>>>>>> add09c4551fc070f52c6b4d6d012825de44b9797
 from argparse import ArgumentParser
 from string import Template
 
