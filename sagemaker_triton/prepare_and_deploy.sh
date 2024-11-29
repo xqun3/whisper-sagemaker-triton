@@ -65,19 +65,11 @@ if [ -z "${N_MELS}" ]; then
     echo "请提供 n_mels 的新值"
     exit 1
 fi
-<<<<<<< HEAD
 wget -nc --directory-prefix=$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/1/ https://raw.githubusercontent.com/openai/whisper/main/whisper/assets/multilingual.tiktoken
 # 使用 sed 命令修改 config.pbtxt 文件
 sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
 head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
 echo "n_mels 的值已更新为 $N_MELS"
-=======
-
-# # 使用 sed 命令修改 config.pbtxt 文件
-# sed -i '/key: "n_mels"/,/string_value:/ s/string_value:"[0-9]*"/string_value:"'${N_MELS}'"/' "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt"
-# head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/config.pbtxt
-# echo "n_mels 的值已更新为 $N_MELS"
->>>>>>> add09c4551fc070f52c6b4d6d012825de44b9797
 
 echo "开始上传模型到S3..."
 aws s3 sync "$PROJECT_ROOT/sagemaker_triton/whisper_trt/" "$S3_PATH" --exclude "*/__pycache__/*"
