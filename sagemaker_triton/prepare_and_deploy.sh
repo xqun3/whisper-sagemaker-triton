@@ -56,7 +56,7 @@ echo $PROJECT_ROOT
 echo $DOCKER_IMAGE
 docker run --rm -it --net host --shm-size=2g --gpus all \
   -v "$PROJECT_ROOT/sagemaker_triton/:/workspace/" \
-  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model_c.sh $MODEL_NAME"
+  $DOCKER_IMAGE bash -c "cd /workspace && bash export_model.sh $MODEL_NAME"
 check_status "模型编译"
 
 # 步骤4: 上传编译后的模型到S3
@@ -72,7 +72,7 @@ head -n20 $PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/whisper/confi
 echo "n_mels 的值已更新为 $N_MELS"
 
 echo "开始上传模型到S3..."
-aws s3 sync "$PROJECT_ROOT/sagemaker_triton/whisper_trt/" "$S3_PATH" --exclude "*/__pycache__/*"
+aws s3 sync "$PROJECT_ROOT/sagemaker_triton/model_repo_whisper_trtllm/" "$S3_PATH" --exclude "*/__pycache__/*"
 check_status "模型上传到S3"
 
 # 步骤5: 修改模型部署脚本

@@ -11,7 +11,7 @@ S3_PATH="s3://triton-models-xq/test_turbo/"
 # Docker 配置
 ## 注意：如果修了docker image 的值，也需要同步修改 deploy_and_test_preprocessed.ipynb 文件里的镜像地址
 ## 默认的 image url 会是: ${AWS_ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${DOCKER_IMAGE}
-DOCKER_IMAGE="sagemaker-endpoint/whisper-triton-byoc-infl:latest"
+DOCKER_IMAGE="sagemaker-endpoint/whisper-triton-byoc:latest"
 
 # 模型配置
 # MODEL_NAME="base"
@@ -40,4 +40,4 @@ USE_LORA=false  # 设置为 true 如果需要合并 LoRA 模型
 LORA_PATH="/home/ec2-user/SageMaker/test_whisper/lora_model/checkpoint-135"  # 仅在 USE_LORA 为 true 时使用
 
 # 其他配置
-CONDA_ENV="tts"
+CONDA_ENV="pytorch_p310"
