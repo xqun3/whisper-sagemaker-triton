@@ -16,4 +16,4 @@ tritonclient[grpc]
 fastapi
 numpy
 aiohttp
-
+pynvml==11.5.0
