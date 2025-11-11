@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-triton-g6e
+  labels:
+    app: whisper-triton-g6e
+    service: whisper-triton
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper-triton-g6e
+  template:
+    metadata:
+      labels:
+        app: whisper-triton-g6e
+        service: whisper-triton
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: ml.g6e.2xlarge
+      containers:
+      - name: whisper-triton
+        image: 596899493901.dkr.ecr.us-east-2.amazonaws.com/sagemaker-endpoint/whisper-triton-byoc-g6e:latest
+        ports:
+        - containerPort: 10086
+        - containerPort: 8080
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            cp /workspace/scripts/* /workspace/
+            model_repo_path=/workspace/model_repo_whisper_trtllm
+            tritonserver --model-repository $model_repo_path \
+              --pinned-memory-pool-byte-size=2048000000 \
+              --cuda-memory-pool-byte-size=0:4096000000 \
+              --http-port 10086 \
+              --metrics-port 10087 > triton.log 2>&1 &
+            triton_pid=$!
+            timeout=30
+            while [ $timeout -gt 0 ]; do
+              if kill -0 $triton_pid 2>/dev/null; then
+                echo "Triton server started successfully"
+                python3 /workspace/run_server.py -w 32
+                exit 0
+              fi
+              sleep 1
+              ((timeout--))
+            done
+            echo "Error: Triton server failed to start"
+            exit 1
+        volumeMounts:
+        - name: triton-models
+          mountPath: /workspace/model_repo_whisper_trtllm
+          subPath: test_turbo_g6e
+        - name: whisper-scripts
+          mountPath: /workspace/scripts
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+          limits:
+            nvidia.com/gpu: 1
+      volumes:
+      - name: triton-models
+        persistentVolumeClaim:
+          claimName: triton-models-xq
+      - name: whisper-scripts
+        configMap:
+          name: whisper-scripts
+          defaultMode: 0755
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whisper-triton-g5
+  labels:
+    app: whisper-triton-g5
+    service: whisper-triton
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whisper-triton-g5
+  template:
+    metadata:
+      labels:
+        app: whisper-triton-g5
+        service: whisper-triton
+    spec:
+      nodeSelector:
+        node.kubernetes.io/instance-type: ml.g5.2xlarge
+      containers:
+      - name: whisper-triton
+        image: 596899493901.dkr.ecr.us-east-2.amazonaws.com/sagemaker-endpoint/whisper-triton-byoc-g6e:latest
+        ports:
+        - containerPort: 10086
+        - containerPort: 8080
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            cp /workspace/scripts/* /workspace/
+            model_repo_path=/workspace/model_repo_whisper_trtllm
+            tritonserver --model-repository $model_repo_path \
+              --pinned-memory-pool-byte-size=2048000000 \
+              --cuda-memory-pool-byte-size=0:4096000000 \
+              --http-port 10086 \
+              --metrics-port 10087 > triton.log 2>&1 &
+            triton_pid=$!
+            timeout=30
+            while [ $timeout -gt 0 ]; do
+              if kill -0 $triton_pid 2>/dev/null; then
+                echo "Triton server started successfully"
+                python3 /workspace/run_server.py -w 32
+                exit 0
+              fi
+              sleep 1
+              ((timeout--))
+            done
+            echo "Error: Triton server failed to start"
+            exit 1
+        volumeMounts:
+        - name: triton-models
+          mountPath: /workspace/model_repo_whisper_trtllm
+          subPath: test_turbo
+        - name: whisper-scripts
+          mountPath: /workspace/scripts
+        resources:
+          requests:
+            nvidia.com/gpu: 1
+          limits:
+            nvidia.com/gpu: 1
+      volumes:
+      - name: triton-models
+        persistentVolumeClaim:
+          claimName: triton-models-xq
+      - name: whisper-scripts
+        configMap:
+          name: whisper-scripts
+          defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whisper-triton-unified-nlb
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: triton
+      port: 10086
+      protocol: TCP
+      targetPort: 10086
+  selector:
+    service: whisper-triton
+  type: LoadBalancer

@@ -53,6 +53,44 @@
 5. 调用测试：
    部署后，您可以使用 SageMaker 端点进行转录。notebook 中包含了转录音频文件的示例代码，同时也可以参考 [test_whisper_api.py](https://github.com/xqun3/whisper-sagemaker-triton/blob/main/sagemaker_triton/test_whisper_api.py) 进行调用
 
+## SageMaker Hyperpod EKS 混合部署
+
+除了标准的 SageMaker Endpoint 部署方式，本项目还支持使用 SageMaker Hyperpod EKS 进行混合部署，适用于需要更灵活的集群管理和资源调度的场景。
+
+### 部署说明
+
+详细的 Hyperpod EKS 部署方法请参考 [hyperpod_hybrid](./hyperpod_hybrid/) 目录，其中包含：
+
+- 完整的部署配置文件（支持 ConfigMap、PV Scripts、独立 LoadBalancer 三种方式）
+- 自动化部署脚本
+- 测试脚本和示例
+- 详细的 README 文档
+
+### 快速开始
+
+1. 确保已完成模型编译并上传到 S3（参考上述"模型编译部署"步骤 1-3）
+
+2. 进入 hyperpod_hybrid 目录：
+   ```bash
+   cd hyperpod_hybrid
+   ```
+
+3. 选择部署方式（推荐使用 PV Scripts 方式）：
+   ```bash
+   # 上传脚本到 S3
+   ./upload_scripts_to_s3.sh
+   
+   # 部署
+   ./deploy_pv_scripts.sh
+   ```
+
+4. 测试部署：
+   ```bash
+   python3 test_unified_lb.py
+   ```
+
+更多详细信息和其他部署选项，请查看 [hyperpod_hybrid/README.md](./hyperpod_hybrid/README.md)
+
 ## Docker 镜像
 
 Docker 镜像基于 NVIDIA Triton 服务器镜像（nvcr.io/nvidia/tritonserver:24.05-py3），并包含以下关键组件：
