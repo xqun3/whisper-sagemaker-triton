@@ -71,7 +71,7 @@ spec:
       volumes:
       - name: triton-models-scripts
         persistentVolumeClaim:
-          claimName: triton-models-xq
+          claimName: triton-models
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -146,7 +146,7 @@ spec:
       volumes:
       - name: triton-models-scripts
         persistentVolumeClaim:
-          claimName: triton-models-xq
+          claimName: triton-models
 ---
 apiVersion: v1
 kind: Service

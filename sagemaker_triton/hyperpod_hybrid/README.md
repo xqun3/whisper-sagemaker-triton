@@ -7,6 +7,26 @@ This directory contains the successful deployment configuration for Whisper Trit
 2. Upload models to S3
 3. Bind the S3 path as PV in the cluster
 
+## S3 Bucket PV/PVC Binding
+
+### Create PersistentVolume and PersistentVolumeClaim for S3 bucket:
+
+```bash
+# Apply PV configuration
+kubectl apply -f pv-triton-models.yaml
+
+# Apply PVC configuration  
+kubectl apply -f pvc-triton-models.yaml
+
+# Verify binding
+kubectl get pv,pvc
+```
+
+The configurations use AWS S3 CSI driver to mount `triton-models-xq` S3 bucket:
+- **PV**: `pv-triton-models` (1200Gi, ReadWriteMany)
+- **PVC**: `triton-models` (bound to PV)
+- **Mount options**: `allow-delete`, `region us-east-1`
+
 ## Deployment Options
 
 ### Option 1: ConfigMap Scripts (Current)
