@@ -6,7 +6,7 @@ metadata:
     app: whisper-triton-g6e
     service: whisper-triton
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: whisper-triton-g6e
@@ -15,6 +15,10 @@ spec:
       labels:
         app: whisper-triton-g6e
         service: whisper-triton
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "10087"
+        prometheus.io/path: "/metrics"
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: ml.g6e.2xlarge
@@ -24,6 +28,8 @@ spec:
         ports:
         - containerPort: 10086
         - containerPort: 8080
+        - containerPort: 10087
+          name: metrics
         command: ["/bin/bash", "-c"]
         args:
           - |
@@ -90,6 +96,10 @@ spec:
       labels:
         app: whisper-triton-g5
         service: whisper-triton
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "10087"
+        prometheus.io/path: "/metrics"
     spec:
       nodeSelector:
         node.kubernetes.io/instance-type: ml.g5.2xlarge
@@ -99,6 +109,8 @@ spec:
         ports:
         - containerPort: 10086
         - containerPort: 8080
+        - containerPort: 10087
+          name: metrics
         command: ["/bin/bash", "-c"]
         args:
           - |
