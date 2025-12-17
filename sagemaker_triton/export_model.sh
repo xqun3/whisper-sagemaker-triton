@@ -8,6 +8,7 @@ if [ -d "TensorRT-LLM" ]; then
     rm -rf TensorRT-LLM
 fi
 
+pip install onnx==1.19.1
 git clone -b v0.15.0 https://github.com/NVIDIA/TensorRT-LLM.git
 cd /workspace/TensorRT-LLM/examples/whisper
 
