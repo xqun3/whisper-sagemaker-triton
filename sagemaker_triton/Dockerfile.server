@@ -13,6 +13,7 @@ pip install tritonclient[all] && \
 pip install -r requirements.txt && \
 pip uninstall cuda-bindings -y && \
 pip install cuda-python==12.1.0 && \
+pip install onnx==1.19.1 && \
 chmod +x /workspace/serve
 
 
