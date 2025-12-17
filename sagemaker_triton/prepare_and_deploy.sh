@@ -31,7 +31,11 @@ check_status "Docker镜像构建和推送"
 # 步骤2: 准备模型
 echo "开始准备模型..."
 source activate $CONDA_ENV || { echo "错误：无法激活 $CONDA_ENV 环境"; exit 1; }
-pip install openai-whisper peft transformers
+# pip install openai-whisper peft transformers
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+pip install --upgrade pip
+pip install openai-whisper peft transformers 
 check_status "依赖项安装"
 
 mkdir -p "$PROJECT_ROOT/sagemaker_triton/assets"
